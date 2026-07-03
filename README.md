@@ -150,16 +150,30 @@ discbag flight <disc> 6/5/-1/2 [--distance 255] [--confidence 5]   # how it flie
 
 ### Use tracking
 ```bash
-discbag used mako3 warlock leopard eagle   # "I used these today" (timestamped)
-discbag used mako3 --date 2026-07-03        # backfill a past round
-discbag round-used warlock mako3 leopard    # semantic alias of `used`
+discbag round-used warlock mako3 leopard    # "I played these in a round today" (timestamped)
+discbag practice-used mako3 eagle warlock   # "I practiced with these" (backyard, field, net)
+discbag used mako3 warlock leopard eagle    # alias of round-used
+discbag round-used mako3 --date 2026-07-03  # backfill a past session
 discbag usage [<disc>]                       # per-disc, or overall (most used / neglected)
 ```
-Lightweight, round-level tracking — not throw-by-throw. Each use bumps a **use count**,
-sets **last used** (timestamped), and appends to a use log. This signal feeds the
-build-bag goals: **confidence** and **tournament** favor discs you use often and recently,
-**development** nudges toward under-used discs that deserve reps, and **fun** revisits
-discs you haven't thrown lately.
+Lightweight, session-level tracking — not throw-by-throw; it just answers *which discs did
+I use this session*. Two kinds of session are recorded separately: an actual **round**
+(`round-used`, or `used`) and **practice** (`practice-used` — backyard, field work, putting,
+net sessions). Both bump the same **use count** and set **last used**; only the session
+context differs, so `usage` can break it down:
+
+```text
+Use count:      2
+Rounds:         1
+Practices:      1
+Last round:     Jul 1
+Last practice:  Jul 3
+```
+
+This signal feeds the build-bag goals: **confidence** and **tournament** favor discs you use
+often and recently, **development** nudges toward under-used discs that deserve reps, and
+**fun** revisits discs you haven't thrown lately. (Legacy uses recorded before this split
+count as rounds.)
 
 ### You
 ```bash

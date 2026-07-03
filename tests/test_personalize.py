@@ -90,7 +90,8 @@ def test_record_use_increments_and_timestamps(tmp_path):
     u = inv.list_discs()[0].user
     assert u.use_count == 1
     assert u.last_used == "2026-07-03T12:00:00+00:00"
-    assert u.use_dates == ["2026-07-03T12:00:00+00:00"]
+    # A use is stored with its session type; the default is a round.
+    assert u.use_dates == [{"date": "2026-07-03T12:00:00+00:00", "session_type": "round"}]
 
 
 def test_record_use_accumulates(tmp_path):
@@ -106,6 +107,37 @@ def test_record_use_accumulates(tmp_path):
 def test_record_use_unknown_returns_zero(tmp_path):
     inv = inv_with(tmp_path, MAKO3)
     assert inv.record_use("nope", "2026-07-03") == 0
+
+
+def test_record_use_records_practice_session(tmp_path):
+    inv = inv_with(tmp_path, MAKO3)
+    inv.record_use("mako3", "2026-07-03T12:00:00+00:00", session_type="practice")
+    u = inv.list_discs()[0].user
+    assert u.use_count == 1                       # count is session-agnostic
+    assert u.use_dates[-1]["session_type"] == "practice"
+
+
+def test_session_counts_and_last_treat_legacy_as_round():
+    from discbag.inventory import UserData
+    u = UserData.from_dict({
+        "use_count": 3,
+        "use_dates": [
+            "2026-06-01T00:00:00+00:00",   # legacy bare string -> counts as a round
+            {"date": "2026-07-02T00:00:00+00:00", "session_type": "round"},
+            {"date": "2026-07-03T00:00:00+00:00", "session_type": "practice"},
+        ],
+    })
+    assert u.round_count == 2
+    assert u.practice_count == 1
+    assert u.last_round == "2026-07-02T00:00:00+00:00"
+    assert u.last_practice == "2026-07-03T00:00:00+00:00"
+
+
+def test_session_stats_empty_when_never_used():
+    from discbag.inventory import UserData
+    u = UserData()
+    assert u.round_count == 0 and u.practice_count == 0
+    assert u.last_round is None and u.last_practice is None
 
 
 def test_legacy_throw_count_migrates_to_use_count():

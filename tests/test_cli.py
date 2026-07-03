@@ -99,3 +99,28 @@ def test_format_profile_shows_preferred_brands():
     out = cli.format_profile(PlayerProfile(max_distance=283, preferred_brands=["Innova", "MVP"]))
     assert "Preferences" in out
     assert "Innova, MVP" in out
+
+
+def _ns(**kw):
+    from argparse import Namespace
+    return Namespace(**kw)
+
+
+def test_cmd_used_records_a_round_by_default(tmp_path, capsys):
+    from discbag import inventory
+    inv = inventory.Inventory(path=tmp_path / "inventory.json")
+    inv.add(OwnedDisc.from_db_record(MAKO3))
+    cli.cmd_used(_ns(discs=["mako3"], date="2026-07-03", session_type="round"), inv)
+    u = inv.list_discs()[0].user
+    assert u.round_count == 1 and u.practice_count == 0
+    assert "round use" in capsys.readouterr().out
+
+
+def test_cmd_used_records_a_practice_session(tmp_path, capsys):
+    from discbag import inventory
+    inv = inventory.Inventory(path=tmp_path / "inventory.json")
+    inv.add(OwnedDisc.from_db_record(MAKO3))
+    cli.cmd_used(_ns(discs=["mako3"], date="2026-07-03", session_type="practice"), inv)
+    u = inv.list_discs()[0].user
+    assert u.practice_count == 1 and u.round_count == 0
+    assert "practice use" in capsys.readouterr().out

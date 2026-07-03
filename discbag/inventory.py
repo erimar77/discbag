@@ -23,6 +23,15 @@ RUNTIME_INVENTORY_PATH = RUNTIME_DIR / "inventory.json"
 _MOLD_FIELDS = ("name", "brand", "category", "speed", "glide", "turn", "fade", "stability")
 
 
+def _normalize_use(entry):
+    """A use-log entry as {"date", "session_type"}. A bare timestamp string is a
+    legacy round; a dict may omit the type (defaults to round)."""
+    if isinstance(entry, dict):
+        return {"date": entry.get("date"),
+                "session_type": entry.get("session_type") or "round"}
+    return {"date": entry, "session_type": "round"}
+
+
 @dataclass
 class Disc:
     """Manufacturer / mold data. Immutable facts sourced from the database."""
@@ -62,10 +71,11 @@ class UserData:
     tags: List[str] = field(default_factory=list)
     role: str = ""
     # Lightweight use tracking (not throw-by-throw): a count, the last-used timestamp,
-    # and a timestamped log of uses.
+    # and a log of uses. Each log entry is {"date": ..., "session_type": "round"|"practice"};
+    # legacy entries are bare timestamp strings and count as rounds.
     use_count: int = 0
     last_used: Optional[str] = None
-    use_dates: List[str] = field(default_factory=list)
+    use_dates: List = field(default_factory=list)
     notes: str = ""
     personal_flight: Optional[dict] = None
 
@@ -80,6 +90,35 @@ class UserData:
 
     def to_dict(self):
         return asdict(self)
+
+    # --- session-typed use log ---
+
+    @property
+    def uses(self):
+        """Normalized use entries: {"date", "session_type"}. Bare-string (legacy)
+        entries are treated as rounds — that was the only session type before."""
+        return [_normalize_use(e) for e in (self.use_dates or [])]
+
+    @property
+    def round_count(self):
+        return sum(1 for e in self.uses if e["session_type"] == "round")
+
+    @property
+    def practice_count(self):
+        return sum(1 for e in self.uses if e["session_type"] == "practice")
+
+    def _last_of(self, session_type):
+        dates = [e["date"] for e in self.uses
+                 if e["session_type"] == session_type and e["date"]]
+        return max(dates) if dates else None
+
+    @property
+    def last_round(self):
+        return self._last_of("round")
+
+    @property
+    def last_practice(self):
+        return self._last_of("practice")
 
 
 @dataclass
@@ -290,12 +329,14 @@ class Inventory:
     def set_personal_flight(self, name, personal):
         return self._mutate(name, lambda u: setattr(u, "personal_flight", personal))
 
-    def record_use(self, name, when):
-        """Record that a disc was used at timestamp `when`: bump the count, set
-        last_used, and append to the timestamped log. Returns discs updated."""
+    def record_use(self, name, when, session_type="round"):
+        """Record that a disc was used at timestamp `when` in a session of the given
+        type ("round" or "practice"): bump the count, set last_used, and append a
+        typed entry to the log. use_count is session-agnostic. Returns discs updated."""
         def apply(u):
             u.use_count = (u.use_count or 0) + 1
-            u.use_dates = list(u.use_dates or []) + [when]
+            u.use_dates = list(u.use_dates or []) + [
+                {"date": when, "session_type": session_type}]
             # last_used tracks the most recent date, even if uses are backfilled.
             if not u.last_used or str(when)[:10] >= str(u.last_used)[:10]:
                 u.last_used = when

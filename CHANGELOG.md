@@ -35,6 +35,11 @@ All notable changes to this project are documented here. The format is based on
   migrated) and joined by `last_used` and a `use_dates` log. Use signal feeds the build-bag
   goals (confidence/tournament favor frequent & recent use; development favors under-used
   discs; fun revisits neglected ones).
+- Rounds and practice are tracked separately. `discbag practice-used <disc>...` records a
+  practice session (backyard, field, putting, net); `round-used`/`used` record a round. Each
+  use log entry now carries a `session_type`, and `usage` breaks the total down into Rounds /
+  Practices with the last of each. `use_count` still increments for both — only the context
+  differs. Legacy string entries count as rounds; no migration required.
 
 ## [0.1.0] - 2026-07-02
 

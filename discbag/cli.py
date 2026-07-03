@@ -376,11 +376,13 @@ def _days_ago(when, now_iso=None):
 
 def cmd_used(args, inv):
     when = args.date or _now_iso()
+    session_type = getattr(args, "session_type", "round")
     recorded, missing = [], []
     for name in args.discs:
-        (recorded if inv.record_use(name, when) else missing).append(name)
+        (recorded if inv.record_use(name, when, session_type) else missing).append(name)
     if recorded:
-        print(f"Recorded use ({when[:10]}) for: {', '.join(recorded)}.")
+        label = "practice" if session_type == "practice" else "round"
+        print(f"Recorded {label} use ({when[:10]}) for: {', '.join(recorded)}.")
     for name in missing:
         print(f"No disc named '{name}' in your bag.", file=sys.stderr)
     return 0 if recorded else 1
@@ -405,6 +407,14 @@ def cmd_usage(args, inv):
             else:
                 print("  Last used: never")
                 print("  Recently used: No")
+            # Break the count down by session type when either kind is on record.
+            if u.round_count or u.practice_count:
+                print(f"  Rounds: {u.round_count}")
+                print(f"  Practices: {u.practice_count}")
+                if u.last_round:
+                    print(f"  Last round: {u.last_round[:10]}")
+                if u.last_practice:
+                    print(f"  Last practice: {u.last_practice[:10]}")
             print()
         return 0
 
@@ -945,12 +955,17 @@ def build_parser():
     p_bagcmd.add_argument("name", nargs="*")
     p_bagcmd.set_defaults(func=cmd_bag)
 
-    for cmd_name, cmd_help in [("used", "record that you used these discs (today, or --date)"),
-                               ("round-used", "record the discs you used in a round (alias of used)")]:
+    # round-used / used record a round; practice-used records a practice session.
+    # use_count increments the same either way — only the session context differs.
+    for cmd_name, session_type, cmd_help in [
+            ("used", "round", "record that you used these discs in a round (today, or --date)"),
+            ("round-used", "round", "record the discs you used in a round (alias of used)"),
+            ("practice-used", "practice",
+             "record the discs you used in a practice session (backyard, field, putting, net)")]:
         p_used = sub.add_parser(cmd_name, help=cmd_help)
         p_used.add_argument("discs", nargs="+")
         p_used.add_argument("--date", help="record for a specific date (YYYY-MM-DD)")
-        p_used.set_defaults(func=cmd_used)
+        p_used.set_defaults(func=cmd_used, session_type=session_type)
 
     p_usage = sub.add_parser("usage", help="show disc use stats (per disc or overall)")
     p_usage.add_argument("disc", nargs="?", help="a disc to show; omit for overall stats")
