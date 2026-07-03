@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "discbag"
+version = "0.1.0"
+description = "A command-line disc golf bag intelligence engine."
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Eric Martin" }]
+requires-python = ">=3.9"
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/erimar77/discbag"
+
+[project.scripts]
+discbag = "discbag.cli:main"
+
+[tool.setuptools]
+packages = ["discbag"]
+
+[tool.setuptools.package-data]
+discbag = ["data/*.json"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
