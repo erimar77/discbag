@@ -145,3 +145,55 @@ def test_no_rotation_is_deterministic_best():
     r1 = {f.role.name: f.disc.name for f in recommend.build_bag(bag).filled}
     r2 = {f.role.name: f.disc.name for f in recommend.build_bag(bag).filled}
     assert r1 == r2
+
+
+# ---------- explainable scoring ----------
+
+def _role(name):
+    from discbag import roles
+    return next(r for r in roles.ROLES if r.name == name)
+
+
+def test_score_disc_components_sum_to_total():
+    s = recommend.score_disc(MAKO3, _role("Straight mid"), goal="coverage")
+    assert sum(c.points for c in s.components) == s.total
+    assert any(c.label == "Role fit" for c in s.components)
+
+
+def test_better_fit_scores_higher():
+    mid = _role("Straight mid")
+    good = recommend.score_disc(MAKO3, mid).total                      # 5/0/0, great fit
+    worse = recommend.score_disc(Disc(name="Off", speed=6.5, glide=5, turn=0.5, fade=1.5),
+                                 mid).total
+    assert good > worse
+
+
+def test_development_breakdown_names_its_parts():
+    prof = PlayerProfile(max_distance=275)
+    s = recommend.score_disc(FIREBIRD, _role("Utility driver"),
+                             goal="development", profile=prof)
+    labels = {c.label for c in s.components}
+    assert "Power mismatch" in labels
+    assert "Scenario adjustment" in labels
+
+
+def test_goal_penalty_still_equals_sum_of_components():
+    # Refactor guard: the decomposed components must sum to the original penalty.
+    prof = PlayerProfile(max_distance=275)
+    for goal in ("development", "confidence", "tournament", "fun"):
+        parts = sum(v for _, v in recommend._goal_components(goal, MAKO3, prof))
+        assert abs(parts - recommend._goal_penalty(goal, MAKO3, prof)) < 1e-9
+
+
+def test_build_bag_explained_reports_selection_and_rotation():
+    class LastRNG:
+        def choice(self, seq):
+            return seq[-1]
+
+    bag = [MAKO3, Disc(name="Buzzz", speed=5, glide=4, turn=-1, fade=1)]
+    decisions = recommend.build_bag_explained(bag, rotate=True, rng=LastRNG())
+    mid = next(d for d in decisions if d.role.name == "Straight mid")
+    assert mid.selected is not None
+    assert len(mid.comparable) == 2       # both are comparable straight mids
+    assert mid.rotated is True            # rng picked the non-top candidate
+    assert [c.disc.name for c in mid.candidates]  # ranked candidates present

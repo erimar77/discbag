@@ -24,6 +24,11 @@ All notable changes to this project are documented here. The format is based on
   compose with goals.
 - `build-bag --rotate` varies among comparably-scored discs for controlled variety, never
   selecting a notably worse disc.
+- Explainable scoring for tuning the engine: `discbag explain build-bag` (per-role
+  selection, score, other candidates, and rotation visibility), `discbag explain role
+  "<name>"` (profile + ranked candidate scores), and `discbag score <disc>... [--verbose]`
+  (a component breakdown — role fit, goal sub-terms, scenario — summing to a points total).
+  Only components the engine actually uses are exposed.
 - Lightweight use tracking: `discbag used <disc>...` (and the `round-used` alias) records a
   timestamped use, `--date` backfills a past round, and `discbag usage` summarizes per-disc
   or overall (most used / neglected). `throw_count` is renamed to `use_count` (legacy data

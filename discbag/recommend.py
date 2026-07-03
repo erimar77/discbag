@@ -75,11 +75,15 @@ def _overpower(disc, profile):
     return max(0.0, player.required_power(disc) - ps)
 
 
-def _goal_penalty(goal, disc, profile, today=None):
-    """A per-disc adjustment (lower = more preferred) layered on role fit."""
+def _goal_components(goal, disc, profile, today=None):
+    """The named parts of a goal's per-disc adjustment (internal, lower = better).
+
+    Returns a list of (label, value) — negative values reward, positive penalize.
+    Summing them gives the goal penalty. Zero-valued parts are dropped.
+    """
     goal = (goal or "coverage").lower()
     if goal == "coverage":
-        return 0.0
+        return []
 
     user = getattr(disc, "user", None)
     uses = getattr(user, "use_count", 0) or 0
@@ -88,27 +92,79 @@ def _goal_penalty(goal, disc, profile, today=None):
     usage = min(uses, 50) / 50.0  # 0..1
     recent = _used_recently(disc, today)
 
+    parts = []
     if goal == "development":
-        # Reward discs the player can power, that aren't highly specialized, and that
-        # are under-used (they deserve practice reps).
-        return 0.9 * _overpower(disc, profile) + 0.5 * max(0.0, abs(stab) - 2) \
-            - 0.4 * (1 - usage)
-    if goal == "confidence":
-        # Reward proven, recently used, favorite, predictable discs you can power.
-        return (-1.5 * usage) + (-0.5 if recent else 0.0) + (-1.0 if favorite else 0.0) \
-            + 0.6 * max(0.0, -stab - 1) + 0.5 * _overpower(disc, profile)
-    if goal == "tournament":
-        # Reward a proven, recently trusted, reliable mold; penalize risk / over-power.
-        return (-1.5 * usage) + (-0.3 if recent else 0.0) \
-            + 0.8 * max(0.0, -stab) + 0.6 * _overpower(disc, profile)
-    if goal == "fun":
-        # Favorites first; heavily-used molds are less novel; revisit neglected discs.
-        return (-2.0 if favorite else 0.0) + 0.6 * usage + (0.0 if recent else -0.5)
-    return 0.0
+        parts = [
+            ("Power mismatch", 0.9 * _overpower(disc, profile)),
+            ("Specialization", 0.5 * max(0.0, abs(stab) - 2)),
+            ("Under-used (needs reps)", -0.4 * (1 - usage)),
+        ]
+    elif goal == "confidence":
+        parts = [
+            ("Proven use", -1.5 * usage),
+            ("Recently used", -0.5 if recent else 0.0),
+            ("Favorite", -1.0 if favorite else 0.0),
+            ("Unpredictable (flippy)", 0.6 * max(0.0, -stab - 1)),
+            ("Power mismatch", 0.5 * _overpower(disc, profile)),
+        ]
+    elif goal == "tournament":
+        parts = [
+            ("Proven use", -1.5 * usage),
+            ("Recently used", -0.3 if recent else 0.0),
+            ("Risk (understable)", 0.8 * max(0.0, -stab)),
+            ("Power mismatch", 0.6 * _overpower(disc, profile)),
+        ]
+    elif goal == "fun":
+        parts = [
+            ("Favorite", -2.0 if favorite else 0.0),
+            ("Overused (less novel)", 0.6 * usage),
+            ("Neglected (revisit)", 0.0 if recent else -0.5),
+        ]
+    return [(label, value) for label, value in parts if value]
+
+
+def _goal_penalty(goal, disc, profile, today=None):
+    """A per-disc adjustment (lower = more preferred) layered on role fit."""
+    return sum(value for _, value in _goal_components(goal, disc, profile, today))
 
 
 def _selection_score(disc, role, goal, profile, today=None):
     return roles.fit_score(disc, role) + _goal_penalty(goal, disc, profile, today)
+
+
+# ---------- explainable scoring ----------
+
+# Presentation scale: internal scores are distances (lower = better); we invert them
+# into readable "points" (higher = better) for explain/score output.
+_POINT_SCALE = 10.0
+
+
+@dataclass
+class ScoreComponent:
+    label: str
+    points: int      # higher = better contribution
+
+
+@dataclass
+class DiscScore:
+    disc: object
+    role: roles.Role
+    components: list   # ScoreComponent, in order
+    total: int         # sum of component points (higher = better)
+    internal: float    # raw selection score (lower = better) used for ranking
+
+
+def score_disc(disc, role, goal="coverage", profile=None, today=None, situation=None):
+    """Explainable score of a disc for a role under a goal: components + total."""
+    fit = roles.fit_score(disc, role)
+    components = [ScoreComponent("Role fit", round(100 - fit * _POINT_SCALE))]
+    for label, value in _goal_components(goal, disc, profile, today):
+        components.append(ScoreComponent(label, round(-value * _POINT_SCALE)))
+    # Scenarios only narrow which roles are built; they don't adjust per-disc score.
+    components.append(ScoreComponent("Scenario adjustment", 0))
+    total = sum(c.points for c in components)
+    internal = fit + _goal_penalty(goal, disc, profile, today)
+    return DiscScore(disc=disc, role=role, components=components, total=total, internal=internal)
 
 
 def comparable_group(scored, threshold=ROTATE_THRESHOLD):
@@ -155,3 +211,38 @@ def build_bag(bag, size=None, situation=None, goal="coverage",
         gaps = [r for r in wanted if r.name not in kept_names]
 
     return BagResult(filled=fills, gaps=gaps)
+
+
+@dataclass
+class RoleDecision:
+    role: roles.Role
+    candidates: list    # DiscScore, ranked best-first (qualifying, available discs)
+    selected: object    # the chosen disc, or None if the role is a gap
+    comparable: list    # discs within the rotation threshold of the best
+    rotated: bool       # True if rotation chose other than the top candidate
+
+
+def build_bag_explained(bag, situation=None, goal="coverage", rotate=False,
+                        profile=None, rng=None, today=None):
+    """Like build_bag, but returns a RoleDecision per role: the ranked candidates,
+    the comparable group, the selection, and whether rotation was involved."""
+    wanted = roles.roles_for_situation(situation)
+    used = set()
+    decisions = []
+
+    for role in sorted(wanted, key=lambda r: r.priority):
+        qualifying = [d for d in bag if roles.qualifies(d, role)]
+        available = [d for d in qualifying if id(d) not in used] or qualifying
+        if not available:
+            decisions.append(RoleDecision(role, [], None, [], False))
+            continue
+        ranked = sorted((score_disc(d, role, goal, profile, today) for d in available),
+                        key=lambda s: s.internal)
+        scored = [(s.internal, s.disc) for s in ranked]
+        comparable = comparable_group(scored)
+        pick = _choose(comparable, rotate, rng)
+        used.add(id(pick))
+        rotated = rotate and len(comparable) > 1 and pick is not ranked[0].disc
+        decisions.append(RoleDecision(role, ranked, pick, comparable, rotated))
+
+    return decisions

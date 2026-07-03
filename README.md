@@ -219,6 +219,24 @@ Charts default to a **Braille-dot scatter** (speed vs stability) for a dense vie
 `--type grid` is a labelled letter chart, and `stability`/`speed`/`composition`/`brands`
 are distribution histograms.
 
+### Explain & score (developer tools)
+
+Verbose views into *why* the engine chose what it did — useful for tuning heuristics.
+The standard commands stay concise; these are intentionally verbose.
+
+```bash
+discbag explain build-bag [--goal G] [--minimal|--windy|...] [--rotate]
+                                    # per-role: selected disc, score, other candidates,
+                                    # and whether --rotate actually rotated
+discbag explain role "Control fairway"   # profile + ranked candidate scores + selection
+discbag score eagle crave leopard river [--goal G] [--role NAME]
+discbag score eagle --goal development --verbose   # full component breakdown
+```
+
+Scores are presented as points (higher = better) with a component breakdown — Role fit,
+the goal's sub-terms (power mismatch, proven use, recency, favorite, …), and a scenario
+adjustment — that sum to the total. Only components the engine actually uses are shown.
+
 ---
 
 ## Architecture

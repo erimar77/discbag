@@ -461,6 +461,128 @@ def cmd_build_bag(args, inv):
     return 0
 
 
+def _score_line(disc_score):
+    d = disc_score.disc
+    return f"  {d.name:<16} {disc_score.total:>4}"
+
+
+def _print_breakdown(disc_score):
+    d = disc_score.disc
+    print(f"{d.brand} {d.name}\n")
+    for c in disc_score.components:
+        print(f"  {c.label:<26} {c.points:+d}")
+    print(f"  {'Total':<26} {disc_score.total:>4}")
+
+
+def cmd_explain(args, inv):
+    from discbag import recommend, roles
+    prof = player.load_profile()
+    profile = None if prof.is_empty() else prof
+    today = _now_iso()
+
+    if args.what == "role":
+        role_name = " ".join(args.rest).strip()
+        role = next((r for r in roles.ROLES if r.name.lower() == role_name.lower()), None)
+        if role is None:
+            print(f"Unknown role '{role_name}'. Roles: " +
+                  ", ".join(r.name for r in roles.ROLES))
+            return 1
+        goal = args.goal
+        candidates = sorted((recommend.score_disc(d, role, goal, profile, today)
+                             for d in inv.list_discs() if roles.qualifies(d, role)),
+                            key=lambda s: s.internal)
+        print(f"{role.name}\n")
+        if profile is not None:
+            print("Player Profile")
+            if prof.max_distance:
+                print(f"  Max distance: {prof.max_distance} ft")
+            ps = player.power_speed(prof)
+            if ps is not None:
+                print(f"  Estimated arm power: {ps:.1f}")
+            print()
+        print(f"Goal: {goal}\n")
+        if not candidates:
+            print("No owned disc qualifies for this role.")
+            return 0
+        print("Candidate scores\n")
+        for s in candidates:
+            print(_score_line(s))
+        best = candidates[0]
+        print(f"\nSelected\n\n  {best.disc.brand} {best.disc.name}")
+        if len(candidates) > 1:
+            print("\nOther strong candidates")
+            for s in candidates[1:4]:
+                print(_score_line(s))
+        return 0
+
+    # explain build-bag
+    decisions = recommend.build_bag_explained(
+        inv.list_discs(), situation=args.situation, goal=args.goal,
+        rotate=args.rotate, profile=profile, today=today,
+        rng=(__import__("random").Random() if args.rotate else None))
+    print(f"Goal: {args.goal}")
+    if args.situation:
+        print(f"Scenario: {args.situation}")
+    print()
+    for dec in decisions:
+        print(dec.role.name)
+        if dec.selected is None:
+            print("  (no qualifying disc — gap)\n")
+            continue
+        print(f"  Selected: {dec.selected.brand} {dec.selected.name}")
+        top = next((c for c in dec.candidates if c.disc is dec.selected), dec.candidates[0])
+        print(f"  Score: {top.total}  ({dec.role.covered_reason})")
+        if dec.rotated:
+            names = ", ".join(c.disc.name for c in dec.candidates
+                              if c.disc in dec.comparable)
+            print(f"  Rotation: chose among comparable candidates ({names})")
+        others = [c for c in dec.candidates if c.disc is not dec.selected][:3]
+        if others:
+            print("  Other strong candidates: " +
+                  ", ".join(f"{c.disc.name} {c.total}" for c in others))
+        print()
+    return 0
+
+
+def cmd_score(args, inv):
+    from discbag import recommend, roles
+    prof = player.load_profile()
+    profile = None if prof.is_empty() else prof
+    today = _now_iso()
+    db_discs = db.load_db().get("discs", [])
+
+    pinned = None
+    if args.role:
+        pinned = next((r for r in roles.ROLES if r.name.lower() == args.role.lower()), None)
+        if pinned is None:
+            print(f"Unknown role '{args.role}'.")
+            return 1
+
+    scores = []
+    for name in args.discs:
+        disc = _resolve_disc(name, inv, db_discs)
+        if disc is None:
+            print(f"Couldn't find '{name}' in your bag or the database.")
+            return 1
+        role = pinned or roles.primary_role(disc)
+        scores.append(recommend.score_disc(disc, role, args.goal, profile, today, args.situation))
+
+    scores.sort(key=lambda s: s.internal)
+    print(f"Goal: {args.goal}" + (f"   Role: {pinned.name}" if pinned else "") + "\n")
+    if args.verbose:
+        for s in scores:
+            role_note = "" if pinned else f"  (role: {s.role.name})"
+            _print_breakdown(s)
+            if role_note:
+                print(f" {role_note}")
+            print()
+    else:
+        print(f"  {'Disc':<16} {'Score':>4}")
+        for s in scores:
+            print(_score_line(s))
+    return 0
+
+
 def _print_suggestions(picks):
     if not picks:
         return
@@ -853,6 +975,28 @@ def build_parser():
         p_bag.add_argument(f"--{situ}", dest="situation", action="store_const", const=situ,
                            help=f"shortcut for --situation {situ}")
     p_bag.set_defaults(func=cmd_build_bag, situation=None)
+
+    _GOALS = ["coverage", "development", "confidence", "tournament", "fun"]
+    _SITUATIONS = ["windy", "rain", "woods", "minimal", "travel"]
+
+    p_explain = sub.add_parser("explain",
+                               help="explain the engine's reasoning (developer/tuning tool)")
+    p_explain.add_argument("what", choices=["build-bag", "role"])
+    p_explain.add_argument("rest", nargs="*", help="for 'role': the role name")
+    p_explain.add_argument("--goal", choices=_GOALS, default="coverage")
+    p_explain.add_argument("--rotate", action="store_true")
+    p_explain.add_argument("--situation", choices=_SITUATIONS)
+    for situ in _SITUATIONS:
+        p_explain.add_argument(f"--{situ}", dest="situation", action="store_const", const=situ)
+    p_explain.set_defaults(func=cmd_explain, situation=None)
+
+    p_score = sub.add_parser("score", help="score and compare discs for a goal (developer tool)")
+    p_score.add_argument("discs", nargs="+")
+    p_score.add_argument("--goal", choices=_GOALS, default="coverage")
+    p_score.add_argument("--role", help="score all discs against this role (default: each disc's own)")
+    p_score.add_argument("--situation", choices=_SITUATIONS)
+    p_score.add_argument("--verbose", "-v", action="store_true", help="show the score breakdown")
+    p_score.set_defaults(func=cmd_score, situation=None)
 
     p_rec = sub.add_parser("recommend",
                            help="assess bag coverage; suggest discs for missing roles")
