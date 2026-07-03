@@ -62,6 +62,25 @@ Understable fairway · Control fairway · Utility driver · Distance driver.
 A role is **Covered** when one or more of your discs fly the way it needs; multiple discs
 can share a role. Every verdict is explained.
 
+### Goals: what a bag is *for*
+
+`build-bag` still covers roles, but different players ask different questions, so a
+`--goal` decides *what to optimize* within each role:
+
+- **coverage** (default) — the best-fitting disc per role; fewest discs, most roles.
+- **development** — discs you can power and that reward clean form; avoids specialized molds.
+- **confidence** — the discs you throw most and trust; predictable and comfortable.
+- **tournament** — proven, reliable, low-risk molds; minimal experimentation.
+- **fun** — favorites and variety.
+
+Scenarios (`--windy`, `--woods`, `--rain`, `--minimal`, `--travel`) are **environmental
+modifiers** that narrow *which conditions* the bag is for — orthogonal to the goal, so
+they compose: `discbag build-bag --woods --goal development`.
+
+Add `--rotate` for controlled variety: when several discs fill a role comparably well, it
+picks among them instead of always the single top disc — exposing you to more of your
+collection while never choosing a notably worse disc.
+
 ### Player-aware priority
 
 The same missing role matters differently to different players. A ~250 ft thrower whose
@@ -167,7 +186,8 @@ discbag recommend                   # role coverage: Covered/Missing + Priority 
 discbag recommend --gaps            # only missing roles
 discbag recommend --next            # the single most valuable purchase for you
 discbag recommend --preferred-only  # suggest only from your preferred brands
-discbag build-bag [-n N] [--windy|--woods|--minimal|--travel|--rain]
+discbag build-bag [--goal coverage|development|confidence|tournament|fun] [--rotate]
+                  [-n N] [--windy|--woods|--minimal|--travel|--rain]
 discbag overlap                     # near-duplicate discs (by how they fly for you)
 discbag compare leopard crave river # side-by-side table (from your bag or the database)
 discbag choose --distance 280 --wind head --shape straight   # which disc to throw now

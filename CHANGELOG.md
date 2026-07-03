@@ -19,6 +19,11 @@ All notable changes to this project are documented here. The format is based on
 - Purchase suggestions favor preferred brands softly — the best fits are still shown, but a
   preferred-brand disc is promoted when it fits nearly as well. `recommend --preferred-only`
   restricts suggestions to preferred brands, with a graceful message when none are set.
+- `build-bag --goal coverage|development|confidence|tournament|fun` chooses what the bag
+  optimizes for; scenarios (`--windy`, `--woods`, …) remain environmental modifiers and
+  compose with goals.
+- `build-bag --rotate` varies among comparably-scored discs for controlled variety, never
+  selecting a notably worse disc.
 
 ## [0.1.0] - 2026-07-02
 

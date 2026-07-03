@@ -360,14 +360,21 @@ def cmd_bag(args, inv):
 
 
 def cmd_build_bag(args, inv):
+    import random
+
     from discbag import recommend  # local import keeps startup light
     discs = inv.list_discs()
-    result = recommend.build_bag(discs, size=args.size, situation=args.situation)
+    prof = player.load_profile()
+    profile = None if prof.is_empty() else prof
+    rng = random.Random() if args.rotate else None
+    result = recommend.build_bag(discs, size=args.size, situation=args.situation,
+                                 goal=args.goal, rotate=args.rotate, profile=profile, rng=rng)
 
     if not discs:
         print("Your bag is empty — add discs first with: discbag add <name>")
-    situ = f" for {args.situation}" if args.situation else ""
-    print(f"Recommended bag{situ} (by role):\n")
+    situ = f", {args.situation}" if args.situation else ""
+    rot = ", rotating" if args.rotate else ""
+    print(f"Recommended bag (goal: {args.goal}{situ}{rot}):\n")
     for fit in result.filled:
         d = fit.disc
         plastic = f" [{d.plastic}]" if getattr(d, "plastic", "") else ""
@@ -749,8 +756,14 @@ def build_parser():
 
     p_bag = sub.add_parser("build-bag", help="recommend a bag by role from your inventory")
     p_bag.add_argument("--size", "-n", type=int, help="limit to this many discs")
+    p_bag.add_argument("--goal",
+                       choices=["coverage", "development", "confidence", "tournament", "fun"],
+                       default="coverage",
+                       help="what to optimize the bag for (default: coverage)")
+    p_bag.add_argument("--rotate", action="store_true",
+                       help="vary among comparable discs instead of always the top pick")
     p_bag.add_argument("--situation", choices=["windy", "rain", "woods", "minimal", "travel"],
-                       help="build a bag focused on a situation")
+                       help="environmental modifier: which conditions to build for")
     for situ in ("windy", "rain", "woods", "minimal", "travel"):
         p_bag.add_argument(f"--{situ}", dest="situation", action="store_const", const=situ,
                            help=f"shortcut for --situation {situ}")
