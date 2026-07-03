@@ -88,7 +88,8 @@ def format_owned(disc, profile=None):
         ("Condition", u.condition),
         ("Bought at", u.purchase_location),
         ("Added", u.date_added),
-        ("Throws", u.throw_count or ""),
+        ("Use count", u.use_count or ""),
+        ("Last used", u.last_used[:10] if u.last_used else ""),
         ("Tags", ", ".join(u.tags) if u.tags else ""),
         ("Favorite", "yes" if u.favorite else ""),
     ]
@@ -359,6 +360,78 @@ def cmd_bag(args, inv):
     return 0
 
 
+def _now_iso():
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+
+
+def _days_ago(when, now_iso=None):
+    from datetime import date
+    try:
+        then = date.fromisoformat(str(when)[:10])
+        now = date.fromisoformat((now_iso or _now_iso())[:10])
+    except (TypeError, ValueError):
+        return None
+    return (now - then).days
+
+
+def cmd_used(args, inv):
+    when = args.date or _now_iso()
+    recorded, missing = [], []
+    for name in args.discs:
+        (recorded if inv.record_use(name, when) else missing).append(name)
+    if recorded:
+        print(f"Recorded use ({when[:10]}) for: {', '.join(recorded)}.")
+    for name in missing:
+        print(f"No disc named '{name}' in your bag.", file=sys.stderr)
+    return 0 if recorded else 1
+
+
+def cmd_usage(args, inv):
+    discs = inv.list_discs()
+    if args.disc:
+        matches = [d for d in discs if args.disc.lower() in d.name.lower()]
+        if not matches:
+            print(f"No disc matching '{args.disc}' in your bag.")
+            return 1
+        for d in matches:
+            u = d.user
+            print(f"{d.brand} {d.name}\n")
+            print(f"  Use count: {u.use_count or 0}")
+            if u.last_used:
+                days = _days_ago(u.last_used)
+                ago = "today" if days == 0 else f"{days} days ago"
+                print(f"  Last used: {u.last_used[:10]} ({ago})")
+                print(f"  Recently used: {'Yes' if days is not None and days <= 30 else 'No'}")
+            else:
+                print("  Last used: never")
+                print("  Recently used: No")
+            print()
+        return 0
+
+    used = sorted((d for d in discs if d.user.use_count), key=lambda d: -d.user.use_count)
+    print("Most used discs\n")
+    if used:
+        for d in used[:10]:
+            print(f"  {d.name:<14} {d.user.use_count}")
+    else:
+        print("  (none tracked yet — record a round with: discbag used <disc>...)")
+
+    def staleness(d):
+        # Larger = more neglected; None (never used) sorts as most neglected.
+        if not d.user.use_count:
+            return float("inf")
+        days = _days_ago(d.user.last_used)
+        return float("inf") if days is None else days
+
+    neglected = [d for d in discs if staleness(d) > 30]
+    if neglected:
+        print("\nNeglected discs\n")
+        for d in sorted(neglected, key=staleness, reverse=True):
+            note = "never used" if not d.user.use_count else f"last used {_days_ago(d.user.last_used)} days ago"
+            print(f"  {d.name:<14} {note}")
+    return 0
+
+
 def cmd_build_bag(args, inv):
     import random
 
@@ -368,7 +441,8 @@ def cmd_build_bag(args, inv):
     profile = None if prof.is_empty() else prof
     rng = random.Random() if args.rotate else None
     result = recommend.build_bag(discs, size=args.size, situation=args.situation,
-                                 goal=args.goal, rotate=args.rotate, profile=profile, rng=rng)
+                                 goal=args.goal, rotate=args.rotate, profile=profile,
+                                 rng=rng, today=_now_iso())
 
     if not discs:
         print("Your bag is empty — add discs first with: discbag add <name>")
@@ -748,6 +822,17 @@ def build_parser():
     p_bagcmd.add_argument("action", choices=["add", "remove", "list"])
     p_bagcmd.add_argument("name", nargs="*")
     p_bagcmd.set_defaults(func=cmd_bag)
+
+    for cmd_name, cmd_help in [("used", "record that you used these discs (today, or --date)"),
+                               ("round-used", "record the discs you used in a round (alias of used)")]:
+        p_used = sub.add_parser(cmd_name, help=cmd_help)
+        p_used.add_argument("discs", nargs="+")
+        p_used.add_argument("--date", help="record for a specific date (YYYY-MM-DD)")
+        p_used.set_defaults(func=cmd_used)
+
+    p_usage = sub.add_parser("usage", help="show disc use stats (per disc or overall)")
+    p_usage.add_argument("disc", nargs="?", help="a disc to show; omit for overall stats")
+    p_usage.set_defaults(func=cmd_usage)
 
     sub.add_parser("updatedb", help="refresh the disc database").set_defaults(func=cmd_updatedb)
     sub.add_parser("db-info", help="show database size and age").set_defaults(func=cmd_dbinfo)

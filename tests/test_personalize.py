@@ -82,3 +82,32 @@ def test_filter_by_favorite_and_in_bag(tmp_path):
     inv.set_in_bag("wizard", False)
     assert [d.name for d in inv.filter(favorite=True)] == ["Mako3"]
     assert [d.name for d in inv.filter(in_bag=True)] == ["Mako3"]
+
+
+def test_record_use_increments_and_timestamps(tmp_path):
+    inv = inv_with(tmp_path, MAKO3)
+    assert inv.record_use("mako3", "2026-07-03T12:00:00+00:00") == 1
+    u = inv.list_discs()[0].user
+    assert u.use_count == 1
+    assert u.last_used == "2026-07-03T12:00:00+00:00"
+    assert u.use_dates == ["2026-07-03T12:00:00+00:00"]
+
+
+def test_record_use_accumulates(tmp_path):
+    inv = inv_with(tmp_path, MAKO3)
+    inv.record_use("mako3", "2026-07-01T00:00:00+00:00")
+    inv.record_use("mako3", "2026-07-03T00:00:00+00:00")
+    u = inv.list_discs()[0].user
+    assert u.use_count == 2
+    assert u.last_used == "2026-07-03T00:00:00+00:00"
+    assert len(u.use_dates) == 2
+
+
+def test_record_use_unknown_returns_zero(tmp_path):
+    inv = inv_with(tmp_path, MAKO3)
+    assert inv.record_use("nope", "2026-07-03") == 0
+
+
+def test_legacy_throw_count_migrates_to_use_count():
+    from discbag.inventory import UserData
+    assert UserData.from_dict({"throw_count": 7}).use_count == 7

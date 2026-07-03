@@ -24,6 +24,12 @@ All notable changes to this project are documented here. The format is based on
   compose with goals.
 - `build-bag --rotate` varies among comparably-scored discs for controlled variety, never
   selecting a notably worse disc.
+- Lightweight use tracking: `discbag used <disc>...` (and the `round-used` alias) records a
+  timestamped use, `--date` backfills a past round, and `discbag usage` summarizes per-disc
+  or overall (most used / neglected). `throw_count` is renamed to `use_count` (legacy data
+  migrated) and joined by `last_used` and a `use_dates` log. Use signal feeds the build-bag
+  goals (confidence/tournament favor frequent & recent use; development favors under-used
+  discs; fun revisits neglected ones).
 
 ## [0.1.0] - 2026-07-02
 

@@ -19,6 +19,7 @@ worse disc.
 
 import random
 from dataclasses import dataclass
+from datetime import date
 
 from discbag import player, roles
 
@@ -26,7 +27,27 @@ from discbag import player, roles
 # for rotation — close enough that swapping between them keeps recommendation quality.
 ROTATE_THRESHOLD = 1.0
 
+# A disc used within this many days counts as "recently used".
+RECENT_DAYS = 30
+
 GOALS = ("coverage", "development", "confidence", "tournament", "fun")
+
+
+def _to_date(value):
+    try:
+        return date.fromisoformat(str(value)[:10])
+    except (TypeError, ValueError):
+        return None
+
+
+def _used_recently(disc, today):
+    """True if the disc's last use is within RECENT_DAYS of `today` (an ISO string)."""
+    user = getattr(disc, "user", None)
+    last = _to_date(getattr(user, "last_used", None))
+    ref = _to_date(today)
+    if last is None or ref is None:
+        return False
+    return 0 <= (ref - last).days <= RECENT_DAYS
 
 
 @dataclass
@@ -54,36 +75,40 @@ def _overpower(disc, profile):
     return max(0.0, player.required_power(disc) - ps)
 
 
-def _goal_penalty(goal, disc, profile):
+def _goal_penalty(goal, disc, profile, today=None):
     """A per-disc adjustment (lower = more preferred) layered on role fit."""
     goal = (goal or "coverage").lower()
     if goal == "coverage":
         return 0.0
 
     user = getattr(disc, "user", None)
-    throws = getattr(user, "throw_count", 0) or 0
+    uses = getattr(user, "use_count", 0) or 0
     favorite = bool(getattr(user, "favorite", False))
     stab = _stability(disc)
-    usage = min(throws, 50) / 50.0  # 0..1
+    usage = min(uses, 50) / 50.0  # 0..1
+    recent = _used_recently(disc, today)
 
     if goal == "development":
-        # Reward discs the player can power and that aren't highly specialized.
-        return 0.9 * _overpower(disc, profile) + 0.5 * max(0.0, abs(stab) - 2)
+        # Reward discs the player can power, that aren't highly specialized, and that
+        # are under-used (they deserve practice reps).
+        return 0.9 * _overpower(disc, profile) + 0.5 * max(0.0, abs(stab) - 2) \
+            - 0.4 * (1 - usage)
     if goal == "confidence":
-        # Reward proven, favorite, predictable (overstable) discs the player can power.
-        return (-1.5 * usage) + (-1.0 if favorite else 0.0) \
+        # Reward proven, recently used, favorite, predictable discs you can power.
+        return (-1.5 * usage) + (-0.5 if recent else 0.0) + (-1.0 if favorite else 0.0) \
             + 0.6 * max(0.0, -stab - 1) + 0.5 * _overpower(disc, profile)
     if goal == "tournament":
-        # Reward proven, reliable molds; penalize risky (understable) or over-powered.
-        return (-1.5 * usage) + 0.8 * max(0.0, -stab) + 0.6 * _overpower(disc, profile)
+        # Reward a proven, recently trusted, reliable mold; penalize risk / over-power.
+        return (-1.5 * usage) + (-0.3 if recent else 0.0) \
+            + 0.8 * max(0.0, -stab) + 0.6 * _overpower(disc, profile)
     if goal == "fun":
-        # Favorites first; heavily-thrown molds are a touch less novel.
-        return (-2.0 if favorite else 0.0) + 0.6 * usage
+        # Favorites first; heavily-used molds are less novel; revisit neglected discs.
+        return (-2.0 if favorite else 0.0) + 0.6 * usage + (0.0 if recent else -0.5)
     return 0.0
 
 
-def _selection_score(disc, role, goal, profile):
-    return roles.fit_score(disc, role) + _goal_penalty(goal, disc, profile)
+def _selection_score(disc, role, goal, profile, today=None):
+    return roles.fit_score(disc, role) + _goal_penalty(goal, disc, profile, today)
 
 
 def comparable_group(scored, threshold=ROTATE_THRESHOLD):
@@ -100,7 +125,7 @@ def _choose(group, rotate, rng):
 
 
 def build_bag(bag, size=None, situation=None, goal="coverage",
-              rotate=False, profile=None, rng=None):
+              rotate=False, profile=None, rng=None, today=None):
     """Fill each required role with the disc that best serves the chosen `goal`.
 
     Roles come from the engine (optionally narrowed to a `situation`). A disc is
@@ -117,7 +142,7 @@ def build_bag(bag, size=None, situation=None, goal="coverage",
         if not available:
             gaps.append(role)
             continue
-        scored = sorted(((_selection_score(d, role, goal, profile), d) for d in available),
+        scored = sorted(((_selection_score(d, role, goal, profile, today), d) for d in available),
                         key=lambda t: t[0])
         pick = _choose(comparable_group(scored), rotate, rng)
         used.add(id(pick))

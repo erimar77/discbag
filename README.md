@@ -148,6 +148,19 @@ discbag bag add|remove|list         # which owned discs you currently carry
 discbag flight <disc> 6/5/-1/2 [--distance 255] [--confidence 5]   # how it flies for YOU
 ```
 
+### Use tracking
+```bash
+discbag used mako3 warlock leopard eagle   # "I used these today" (timestamped)
+discbag used mako3 --date 2026-07-03        # backfill a past round
+discbag round-used warlock mako3 leopard    # semantic alias of `used`
+discbag usage [<disc>]                       # per-disc, or overall (most used / neglected)
+```
+Lightweight, round-level tracking — not throw-by-throw. Each use bumps a **use count**,
+sets **last used** (timestamped), and appends to a use log. This signal feeds the
+build-bag goals: **confidence** and **tournament** favor discs you use often and recently,
+**development** nudges toward under-used discs that deserve reps, and **fun** revisits
+discs you haven't thrown lately.
+
 ### You
 ```bash
 discbag profile                     # show your profile dashboard

@@ -61,14 +61,22 @@ class UserData:
     in_bag: bool = True
     tags: List[str] = field(default_factory=list)
     role: str = ""
-    throw_count: int = 0
+    # Lightweight use tracking (not throw-by-throw): a count, the last-used timestamp,
+    # and a timestamped log of uses.
+    use_count: int = 0
+    last_used: Optional[str] = None
+    use_dates: List[str] = field(default_factory=list)
     notes: str = ""
     personal_flight: Optional[dict] = None
 
     @classmethod
     def from_dict(cls, data):
+        data = dict(data or {})
+        # Legacy field: throw_count is now use_count.
+        if "throw_count" in data and "use_count" not in data:
+            data["use_count"] = data["throw_count"]
         known = {f.name for f in fields(cls)}
-        return cls(**{k: v for k, v in (data or {}).items() if k in known})
+        return cls(**{k: v for k, v in data.items() if k in known})
 
     def to_dict(self):
         return asdict(self)
@@ -281,3 +289,14 @@ class Inventory:
 
     def set_personal_flight(self, name, personal):
         return self._mutate(name, lambda u: setattr(u, "personal_flight", personal))
+
+    def record_use(self, name, when):
+        """Record that a disc was used at timestamp `when`: bump the count, set
+        last_used, and append to the timestamped log. Returns discs updated."""
+        def apply(u):
+            u.use_count = (u.use_count or 0) + 1
+            u.use_dates = list(u.use_dates or []) + [when]
+            # last_used tracks the most recent date, even if uses are backfilled.
+            if not u.last_used or str(when)[:10] >= str(u.last_used)[:10]:
+                u.last_used = when
+        return self._mutate(name, apply)

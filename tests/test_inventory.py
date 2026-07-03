@@ -41,7 +41,8 @@ def test_owned_user_defaults():
     assert u.favorite is False
     assert u.tags == []
     assert u.role == ""
-    assert u.throw_count == 0
+    assert u.use_count == 0
+    assert u.last_used is None
     assert u.personal_flight is None
 
 

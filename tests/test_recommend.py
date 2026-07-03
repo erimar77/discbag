@@ -76,11 +76,40 @@ def test_goal_coverage_picks_best_fit_but_development_picks_in_power():
     assert _control_pick(recommend.build_bag(bag, goal="development", profile=prof)) == "Teebird"
 
 
-def test_goal_confidence_prefers_the_disc_you_throw_most():
+def test_goal_confidence_prefers_the_disc_you_use_most():
     a = _owned("Mako3", speed=5, glide=5, turn=0, fade=0)
     b = _owned("Buzzz", speed=5, glide=4, turn=-1, fade=1)
-    b.user.throw_count = 40
+    b.user.use_count = 40
     picked = {f.role.name: f.disc.name for f in recommend.build_bag([a, b], goal="confidence").filled}
+    assert picked.get("Straight mid") == "Buzzz"
+
+
+def test_goal_confidence_prefers_recently_used_disc():
+    a = _owned("Mako3", speed=5, glide=5, turn=0, fade=0)
+    b = _owned("Buzzz", speed=5, glide=4, turn=-1, fade=1)
+    a.user.last_used = "2026-01-01T00:00:00+00:00"   # long ago
+    b.user.last_used = "2026-07-02T00:00:00+00:00"   # recent
+    picked = {f.role.name: f.disc.name for f in
+              recommend.build_bag([a, b], goal="confidence", today="2026-07-03").filled}
+    assert picked.get("Straight mid") == "Buzzz"
+
+
+def test_goal_development_prefers_a_lower_use_disc_for_practice():
+    a = _owned("Mako3", speed=5, glide=5, turn=0, fade=0)
+    b = _owned("Buzzz", speed=5, glide=4, turn=-1, fade=1)
+    a.user.use_count = 30   # well-worn
+    picked = {f.role.name: f.disc.name for f in
+              recommend.build_bag([a, b], goal="development").filled}
+    assert picked.get("Straight mid") == "Buzzz"
+
+
+def test_goal_fun_prefers_a_not_recently_used_disc():
+    a = _owned("Mako3", speed=5, glide=5, turn=0, fade=0)
+    b = _owned("Buzzz", speed=5, glide=4, turn=-1, fade=1)
+    a.user.last_used = "2026-07-02T00:00:00+00:00"   # recent -> less novel
+    b.user.last_used = "2026-01-01T00:00:00+00:00"   # neglected -> fun to revisit
+    picked = {f.role.name: f.disc.name for f in
+              recommend.build_bag([a, b], goal="fun", today="2026-07-03").filled}
     assert picked.get("Straight mid") == "Buzzz"
 
 
