@@ -120,6 +120,23 @@ def power_speed(profile):
     return None
 
 
+def comfort_zones(profile):
+    """Speed ranges the player can throw comfortably now, is developing, and is future.
+
+    Derived from estimated arm power (not hardcoded), to explain why recommendations
+    shift as the player improves. Returns None when arm power is unknown.
+    """
+    ps = power_speed(profile)
+    if ps is None:
+        return None
+    hi = int(round(ps))
+    return {
+        "comfortable": (2, max(2, hi)),
+        "developing": (hi + 1, hi + 2),
+        "future": hi + 3,
+    }
+
+
 def _overstability_shift(disc, ps):
     req = required_power(disc)
     return max(0.0, NEUTRAL_POWER - ps) * _K_BASE + max(0.0, req - ps) * _K_GAP

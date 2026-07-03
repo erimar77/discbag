@@ -72,3 +72,23 @@ def test_format_owned_shows_personal_flight():
     assert "Personal" in out
     assert "6 / 5 / -1 / 2" in out
     assert "255" in out
+
+
+def test_format_profile_sections_units_and_comfort():
+    from discbag.player import PlayerProfile
+    prof = PlayerProfile(experience="beginner", hand="right", putt_hand="left",
+                         style="backhand", typical_distance=250, max_distance=283,
+                         spin_rate=900.0)
+    out = cli.format_profile(prof)
+    for section in ("Experience", "Throwing", "Performance", "Comfort Zone",
+                    "Estimated Arm Power"):
+        assert section in out
+    # units + no stray precision
+    assert "283 ft" in out
+    assert "900 rpm" in out
+    assert "900.0" not in out
+    # derived comfort zone and arm power
+    assert "2-7" in out
+    assert "~Speed 6.9" in out
+    # values are capitalized for display
+    assert "Right" in out and "Left" in out and "Backhand" in out

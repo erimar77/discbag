@@ -569,24 +569,77 @@ def cmd_profile(args, inv):
         print("  discbag profile --typical 250 --max 275 --experience intermediate --hand right")
         return 0
 
-    print("Player Profile\n")
-    rows = [
-        ("Experience", prof.experience), ("Throwing hand", prof.hand),
-        ("Putting hand", prof.putt_hand or (prof.hand and f"{prof.hand} (same as throwing)")),
-        ("Style", prof.style),
-        ("Typical distance", f"{prof.typical_distance} ft" if prof.typical_distance else ""),
-        ("Max distance", f"{prof.max_distance} ft" if prof.max_distance else ""),
-        ("Fairway speed", prof.fairway_speed), ("Driver speed", prof.driver_speed),
-        ("Release speed", prof.release_speed), ("Spin rate", prof.spin_rate),
+    print(format_profile(prof))
+    return 0
+
+
+def _cap(value):
+    return value.capitalize() if value else ""
+
+
+def format_profile(prof):
+    """Render the player profile as a sectioned dashboard with units."""
+    def ft(v):
+        return f"{v} ft" if v else ""
+
+    def rpm(v):
+        return f"{_num_str(v)} rpm" if v else ""
+
+    def mph(v):
+        return f"{_num_str(v)} mph" if v else ""
+
+    def spd(v):
+        return _num_str(v) if v else ""
+
+    sections = [
+        ("Experience", [("Experience", _cap(prof.experience))]),
+        ("Throwing", [
+            ("Throwing hand", _cap(prof.hand)),
+            ("Putting hand", _cap(prof.putt_hand)
+             or (f"{_cap(prof.hand)} (same as throwing)" if prof.hand else "")),
+            ("Style", _cap(prof.style)),
+        ]),
+        ("Performance", [
+            ("Typical distance", ft(prof.typical_distance)),
+            ("Max distance", ft(prof.max_distance)),
+            ("Comfortable fairway speed", spd(prof.fairway_speed)),
+            ("Comfortable driver speed", spd(prof.driver_speed)),
+            ("Release speed", mph(prof.release_speed)),
+            ("Spin rate", rpm(prof.spin_rate)),
+        ]),
     ]
-    for label, value in rows:
-        if value not in (None, ""):
-            print(f"  {label + ':':<18}{value}")
+
+    zones = player.comfort_zones(prof)
+    if zones:
+        sections.append(("Comfort Zone", [
+            ("Comfortable speeds", f"{zones['comfortable'][0]}-{zones['comfortable'][1]}"),
+            ("Developing", f"{zones['developing'][0]}-{zones['developing'][1]}"),
+            ("Future", f"{zones['future']}+"),
+        ]))
+
+    # Drop empty rows and empty sections, then align labels across everything shown.
+    shown = [(title, [(l, v) for l, v in rows if v]) for title, rows in sections]
+    shown = [(title, rows) for title, rows in shown if rows]
+    width = max((len(l) for _, rows in shown for l, _ in rows), default=0) + 1
+
+    lines = ["Player Profile", ""]
+    for title, rows in shown:
+        lines.append(title)
+        lines.append("-" * len(title))
+        for label, value in rows:
+            lines.append(f"{(label + ':'):<{width}} {value}")
+        lines.append("")
+
     ps = player.power_speed(prof)
     if ps is not None:
-        print(f"\n  Estimated arm power: ~speed {ps:.1f} "
-              "(recommendations adapt to this and grow as your distance grows)")
-    return 0
+        lines.append("Estimated Arm Power")
+        lines.append("-" * len("Estimated Arm Power"))
+        lines.append(f"~Speed {ps:.1f}")
+        lines.append("")
+        lines.append("Recommendations automatically adapt as your distance and "
+                     "throwing ability improve.")
+
+    return "\n".join(lines).rstrip()
 
 
 def cmd_flight(args, inv):

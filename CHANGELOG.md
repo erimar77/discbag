@@ -9,6 +9,12 @@ All notable changes to this project are documented here. The format is based on
 ### Added
 - Player profile records a separate putting hand (`--putt-hand`, alias `--putt`) for
   players who throw with one hand and putt with the other.
+- `profile` is now a sectioned dashboard (Experience / Throwing / Performance /
+  Comfort Zone / Estimated Arm Power) with proper units (ft, rpm) and no stray
+  precision.
+- A **Comfort Zone** derived from estimated arm power shows the speed ranges a player
+  throws comfortably, is developing, and can grow into — explaining why recommendations
+  shift as the player improves.
 
 ## [0.1.0] - 2026-07-02
 

@@ -93,3 +93,15 @@ def test_load_profile_missing_returns_empty(tmp_path):
     loaded = player.load_profile(path=tmp_path / "nope.json")
     assert isinstance(loaded, PlayerProfile)
     assert loaded.max_distance is None
+
+
+def test_comfort_zones_derived_from_arm_power():
+    # 283 ft -> ~speed 6.9 -> comfortable through 7, developing 8-9, future 10+.
+    z = player.comfort_zones(PlayerProfile(max_distance=283))
+    assert z["comfortable"] == (2, 7)
+    assert z["developing"] == (8, 9)
+    assert z["future"] == 10
+
+
+def test_comfort_zones_none_without_info():
+    assert player.comfort_zones(PlayerProfile()) is None
