@@ -549,7 +549,8 @@ def cmd_practice(args, inv):
 def cmd_profile(args, inv):
     prof = player.load_profile()
     fieldmap = [
-        ("experience", args.experience), ("hand", args.hand), ("style", args.style),
+        ("experience", args.experience), ("hand", args.hand),
+        ("putt_hand", args.putt_hand), ("style", args.style),
         ("typical_distance", args.typical), ("max_distance", args.max),
         ("fairway_speed", args.fairway_speed), ("driver_speed", args.driver_speed),
         ("release_speed", args.release_speed), ("spin_rate", args.spin),
@@ -570,7 +571,9 @@ def cmd_profile(args, inv):
 
     print("Player Profile\n")
     rows = [
-        ("Experience", prof.experience), ("Hand", prof.hand), ("Style", prof.style),
+        ("Experience", prof.experience), ("Throwing hand", prof.hand),
+        ("Putting hand", prof.putt_hand or (prof.hand and f"{prof.hand} (same as throwing)")),
+        ("Style", prof.style),
         ("Typical distance", f"{prof.typical_distance} ft" if prof.typical_distance else ""),
         ("Max distance", f"{prof.max_distance} ft" if prof.max_distance else ""),
         ("Fairway speed", prof.fairway_speed), ("Driver speed", prof.driver_speed),
@@ -719,7 +722,9 @@ def build_parser():
 
     p_prof = sub.add_parser("profile", help="show or set your player profile")
     p_prof.add_argument("--experience", choices=["beginner", "intermediate", "advanced", "elite"])
-    p_prof.add_argument("--hand", choices=["right", "left"])
+    p_prof.add_argument("--hand", choices=["right", "left"], help="dominant throwing hand")
+    p_prof.add_argument("--putt-hand", "--putt", dest="putt_hand", choices=["right", "left"],
+                        help="putting hand, if you putt with the other hand")
     p_prof.add_argument("--style", choices=["backhand", "forehand", "both"])
     p_prof.add_argument("--typical", type=int, help="typical golf distance (ft)")
     p_prof.add_argument("--max", type=int, help="max controlled distance (ft)")

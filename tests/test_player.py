@@ -78,11 +78,13 @@ def test_adjusted_numbers_no_profile_returns_manufacturer():
 
 def test_profile_roundtrips_to_disk(tmp_path):
     path = tmp_path / "profile.json"
-    p = PlayerProfile(experience="intermediate", hand="right", max_distance=275,
-                      typical_distance=250, fairway_speed=7)
+    p = PlayerProfile(experience="intermediate", hand="right", putt_hand="left",
+                      max_distance=275, typical_distance=250, fairway_speed=7)
     player.save_profile(p, path=path)
     loaded = player.load_profile(path=path)
     assert loaded.experience == "intermediate"
+    assert loaded.hand == "right"
+    assert loaded.putt_hand == "left"   # throws right, putts left
     assert loaded.max_distance == 275
     assert loaded.fairway_speed == 7
 

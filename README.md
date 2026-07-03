@@ -116,9 +116,11 @@ discbag flight <disc> 6/5/-1/2 [--distance 255] [--confidence 5]   # how it flie
 
 ### You
 ```bash
-discbag profile [--typical N --max N --experience .. --hand .. --style ..
-                 --fairway-speed N --driver-speed N]
+discbag profile [--typical N --max N --experience .. --hand .. --putt-hand ..
+                 --style .. --fairway-speed N --driver-speed N]
 ```
+`--hand` is your dominant throwing hand; `--putt-hand` (alias `--putt`) records a
+different putting hand if you putt with the other hand.
 
 ### Intelligence
 ```bash

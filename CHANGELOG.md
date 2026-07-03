@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- Player profile records a separate putting hand (`--putt-hand`, alias `--putt`) for
+  players who throw with one hand and putt with the other.
+
 ## [0.1.0] - 2026-07-02
 
 Initial release — a command-line disc golf bag intelligence engine.

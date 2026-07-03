@@ -40,7 +40,8 @@ POWER_OVERRIDES = {}
 class PlayerProfile:
     # General
     experience: str = ""      # beginner / intermediate / advanced / elite
-    hand: str = ""            # right / left
+    hand: str = ""            # dominant throwing hand: right / left
+    putt_hand: str = ""       # putting hand, if different from the throwing hand
     style: str = ""           # backhand / forehand / both
     # Distance
     typical_distance: Optional[int] = None
