@@ -560,6 +560,12 @@ def cmd_profile(args, inv):
         if value is not None:
             setattr(prof, name, value)
             changed = True
+    if args.clear_brands:
+        prof.preferred_brands = []
+        changed = True
+    elif args.brand:
+        prof.preferred_brands = args.brand
+        changed = True
     if changed:
         player.save_profile(prof)
         print("Player profile updated.\n")
@@ -606,6 +612,9 @@ def format_profile(prof):
             ("Comfortable driver speed", spd(prof.driver_speed)),
             ("Release speed", mph(prof.release_speed)),
             ("Spin rate", rpm(prof.spin_rate)),
+        ]),
+        ("Preferences", [
+            ("Preferred brands", ", ".join(prof.preferred_brands)),
         ]),
     ]
 
@@ -784,7 +793,9 @@ def build_parser():
     p_prof.add_argument("--fairway-speed", dest="fairway_speed", type=float)
     p_prof.add_argument("--driver-speed", dest="driver_speed", type=float)
     p_prof.add_argument("--release-speed", dest="release_speed", type=float)
-    p_prof.add_argument("--spin", type=float, help="typical spin rate")
+    p_prof.add_argument("--spin", type=float, help="typical spin rate (rpm)")
+    p_prof.add_argument("--brand", action="append", help="a preferred brand (repeatable)")
+    p_prof.add_argument("--clear-brands", action="store_true", help="clear preferred brands")
     p_prof.set_defaults(func=cmd_profile)
 
     p_flight = sub.add_parser("flight", help="record how a disc actually flies for you")

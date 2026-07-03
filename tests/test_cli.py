@@ -92,3 +92,10 @@ def test_format_profile_sections_units_and_comfort():
     assert "~Speed 6.9" in out
     # values are capitalized for display
     assert "Right" in out and "Left" in out and "Backhand" in out
+
+
+def test_format_profile_shows_preferred_brands():
+    from discbag.player import PlayerProfile
+    out = cli.format_profile(PlayerProfile(max_distance=283, preferred_brands=["Innova", "MVP"]))
+    assert "Preferences" in out
+    assert "Innova, MVP" in out

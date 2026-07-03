@@ -16,8 +16,9 @@ Nothing here forbids owning or carrying a disc; it only informs recommendations.
 
 import json
 import os
-from dataclasses import asdict, dataclass, fields
+from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
+from typing import List
 from typing import Optional
 
 RUNTIME_DIR = Path(os.path.expanduser("~")) / ".discbag"
@@ -51,6 +52,8 @@ class PlayerProfile:
     driver_speed: Optional[float] = None
     release_speed: Optional[float] = None
     spin_rate: Optional[float] = None
+    # Preferences
+    preferred_brands: List[str] = field(default_factory=list)
 
     @classmethod
     def from_dict(cls, data):
@@ -61,7 +64,7 @@ class PlayerProfile:
         return asdict(self)
 
     def is_empty(self):
-        return all(v in (None, "") for v in asdict(self).values())
+        return all(v in (None, "", [], {}) for v in asdict(self).values())
 
 
 # ---------- disc power requirement ----------

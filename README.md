@@ -77,6 +77,16 @@ Set a player profile and the engine adapts. As your distance grows, low-priority
 (utility drivers, high-speed distance drivers) climb on their own — **the recommendations
 evolve without any change to the engine.**
 
+### The player dashboard
+
+`discbag profile` is your development dashboard. It groups everything into sections
+(Experience, Throwing, Performance, Preferences, Comfort Zone, Estimated Arm Power) and
+records your throwing hand, a separate **putting hand** if you putt with the other hand,
+distances, spin rate, and **preferred brands**. From your estimated arm power it derives a
+**Comfort Zone** — the speeds you throw comfortably today, are developing, and can grow
+into — so the engine's ability-based decisions are easy to understand. Estimated arm power
+is the single metric the recommendation engine reads.
+
 ### Power-aware discs
 
 Each disc has an estimated **power requirement** derived from speed **and** turn **and**
@@ -116,11 +126,35 @@ discbag flight <disc> 6/5/-1/2 [--distance 255] [--confidence 5]   # how it flie
 
 ### You
 ```bash
+discbag profile                     # show your profile dashboard
 discbag profile [--typical N --max N --experience .. --hand .. --putt-hand ..
-                 --style .. --fairway-speed N --driver-speed N]
+                 --style .. --fairway-speed N --driver-speed N --spin N
+                 --brand Innova --brand "Latitude 64" | --clear-brands]
 ```
 `--hand` is your dominant throwing hand; `--putt-hand` (alias `--putt`) records a
-different putting hand if you putt with the other hand.
+different putting hand if you putt with the other hand; `--brand` (repeatable) sets your
+preferred brands. With no arguments, `profile` prints a sectioned dashboard:
+
+```text
+Player Profile
+
+Throwing
+--------
+Throwing hand:      Right
+Putting hand:       Left
+
+Comfort Zone
+------------
+Comfortable speeds: 2-7
+Developing:         8-9
+Future:             10+
+
+Estimated Arm Power
+-------------------
+~Speed 6.9
+
+Recommendations automatically adapt as your distance and throwing ability improve.
+```
 
 ### Intelligence
 ```bash

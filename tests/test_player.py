@@ -105,3 +105,14 @@ def test_comfort_zones_derived_from_arm_power():
 
 def test_comfort_zones_none_without_info():
     assert player.comfort_zones(PlayerProfile()) is None
+
+
+def test_preferred_brands_roundtrip(tmp_path):
+    path = tmp_path / "profile.json"
+    player.save_profile(PlayerProfile(preferred_brands=["Innova", "Discraft"]), path=path)
+    assert player.load_profile(path=path).preferred_brands == ["Innova", "Discraft"]
+
+
+def test_empty_profile_is_empty_with_default_brands():
+    # An otherwise-empty profile must still count as empty despite the [] brands default.
+    assert PlayerProfile().is_empty() is True
