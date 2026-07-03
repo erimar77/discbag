@@ -100,6 +100,35 @@ def test_suggest_returns_qualifying_unowned_discs():
     assert "Destroyer" not in names  # doesn't qualify as utility
 
 
+def test_suggest_prefers_preferred_brand_on_close_fit():
+    from discbag.player import PlayerProfile
+    legacy = Disc(name="Fighter", brand="Legacy", speed=10, glide=3, turn=0, fade=5)
+    innova = Disc(name="Firebird2", brand="Innova", speed=9, glide=3, turn=0, fade=4)
+    prof = PlayerProfile(preferred_brands=["Innova"])
+    picks = roles.suggest(role("Utility driver"), [], [legacy, innova], n=2, profile=prof)
+    assert picks[0].disc.brand == "Innova"          # promoted when the fit is close
+    assert {p.disc.name for p in picks} == {"Fighter", "Firebird2"}  # both still included
+
+
+def test_suggest_keeps_clearly_better_fit_over_preference():
+    from discbag.player import PlayerProfile
+    best = Disc(name="Best", brand="Legacy", speed=10, glide=3, turn=0, fade=4)   # near-ideal
+    far = Disc(name="Far", brand="Innova", speed=13, glide=3, turn=0, fade=6)
+    prof = PlayerProfile(preferred_brands=["Innova"])
+    picks = roles.suggest(role("Utility driver"), [], [best, far], n=2, profile=prof)
+    assert picks[0].disc.name == "Best"             # too far apart to promote
+
+
+def test_suggest_preferred_only_filters_to_preferred_brands():
+    from discbag.player import PlayerProfile
+    legacy = Disc(name="Fighter", brand="Legacy", speed=10, glide=3, turn=0, fade=5)
+    innova = Disc(name="Firebird2", brand="Innova", speed=9, glide=3, turn=0, fade=4)
+    prof = PlayerProfile(preferred_brands=["Innova"])
+    picks = roles.suggest(role("Utility driver"), [], [legacy, innova], n=5,
+                          profile=prof, preferred_only=True)
+    assert [p.disc.brand for p in picks] == ["Innova"]
+
+
 def test_suggest_excludes_owned_molds():
     catalog = [FIREBIRD]
     picks = roles.suggest(role("Utility driver"), owned=[FIREBIRD], catalog=catalog, n=3)

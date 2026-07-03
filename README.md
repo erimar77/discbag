@@ -87,6 +87,11 @@ distances, spin rate, and **preferred brands**. From your estimated arm power it
 into — so the engine's ability-based decisions are easy to understand. Estimated arm power
 is the single metric the recommendation engine reads.
 
+Your **preferred brands** shape purchase suggestions softly: `recommend` still surfaces
+the best-fitting discs, but when a preferred-brand disc fits nearly as well as another it
+is bumped up. A clearly better disc from any brand still wins. Use
+`recommend --preferred-only` to restrict suggestions to your preferred brands entirely.
+
 ### Power-aware discs
 
 Each disc has an estimated **power requirement** derived from speed **and** turn **and**
@@ -161,6 +166,7 @@ Recommendations automatically adapt as your distance and throwing ability improv
 discbag recommend                   # role coverage: Covered/Missing + Priority + reason
 discbag recommend --gaps            # only missing roles
 discbag recommend --next            # the single most valuable purchase for you
+discbag recommend --preferred-only  # suggest only from your preferred brands
 discbag build-bag [-n N] [--windy|--woods|--minimal|--travel|--rain]
 discbag overlap                     # near-duplicate discs (by how they fly for you)
 discbag compare leopard crave river # side-by-side table (from your bag or the database)

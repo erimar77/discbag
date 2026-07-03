@@ -391,14 +391,23 @@ def _print_suggestions(picks):
 
 def cmd_recommend(args, inv):
     from discbag import roles
-    owned = inv.list_discs()
     prof = player.load_profile()
     profile = None if prof.is_empty() else prof
+
+    preferred_only = getattr(args, "preferred_only", False)
+    if preferred_only and not prof.preferred_brands:
+        print("No preferred brands set.\n")
+        print("Use:")
+        print("  discbag profile --brand Gateway --brand Innova")
+        return 0
+
+    owned = inv.list_discs()
     data = db.load_db()
     catalog = [Disc.from_db_record(r) for r in data.get("discs", [])]
 
     if args.next:
-        nxt = roles.best_next(owned, catalog, n=args.per_slot, profile=profile)
+        nxt = roles.best_next(owned, catalog, n=args.per_slot, profile=profile,
+                              preferred_only=preferred_only)
         if nxt is None:
             print("Your bag already covers every essential role — no purchase needed. Nice bag!")
             return 0
@@ -432,7 +441,8 @@ def cmd_recommend(args, inv):
             print(f"  Priority: {cov.priority}\n")
             reason = cov.priority_reason or cov.reason
             print(f"  Reason:\n    {reason}\n")
-            _print_suggestions(roles.suggest(cov.role, owned, catalog, n=args.per_slot))
+            _print_suggestions(roles.suggest(cov.role, owned, catalog, n=args.per_slot,
+                                             profile=profile, preferred_only=preferred_only))
         print()
     return 0
 
@@ -754,6 +764,8 @@ def build_parser():
                        help="only show missing roles")
     p_rec.add_argument("--next", action="store_true",
                        help="recommend a single highest-priority purchase")
+    p_rec.add_argument("--preferred-only", dest="preferred_only", action="store_true",
+                       help="only suggest discs from your preferred brands")
     p_rec.set_defaults(func=cmd_recommend)
 
     p_chart = sub.add_parser("chart", help="ASCII visualizations of your bag")

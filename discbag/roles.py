@@ -228,16 +228,44 @@ def assess(bag, profile=None):
     return assessment
 
 
-def suggest(role, owned, catalog, n=3):
-    """Qualifying discs from the catalog you don't already own, best fit first."""
+# A preferred-brand disc is promoted ahead of a non-preferred one when their fits are
+# within this many fit-score units — "close enough" that brand preference breaks the tie.
+SUGGEST_BRAND_BOOST = 1.0
+
+
+def _preferred_brands(profile):
+    brands = getattr(profile, "preferred_brands", None) or []
+    return {b.strip().lower() for b in brands}
+
+
+def suggest(role, owned, catalog, n=3, profile=None, preferred_only=False):
+    """Qualifying discs from the catalog you don't already own, best fit first.
+
+    Still surfaces the best fits, but when a preferred-brand disc fits nearly as well as
+    a non-preferred one it's promoted above it. `preferred_only` restricts suggestions to
+    preferred brands entirely (ignored if you have no preferred brands set).
+    """
     owned_names = {getattr(d, "mold", d.name).strip().lower() for d in owned}
-    picks = [Pick(d, fit_score(d, role)) for d in catalog
-             if qualifies(d, role) and d.name.strip().lower() not in owned_names]
-    picks.sort(key=lambda p: p.score)
+    preferred = _preferred_brands(profile)
+
+    candidates = [d for d in catalog
+                  if qualifies(d, role) and d.name.strip().lower() not in owned_names]
+    if preferred_only and preferred:
+        candidates = [d for d in candidates
+                      if str(getattr(d, "brand", "")).strip().lower() in preferred]
+
+    def is_preferred(disc):
+        return str(getattr(disc, "brand", "")).strip().lower() in preferred
+
+    picks = [Pick(d, fit_score(d, role)) for d in candidates]
+    # Preferred brands get a fit "discount", so they lead only among close fits;
+    # a clearly better non-preferred disc (gap > boost) still ranks first.
+    picks.sort(key=lambda p: (p.score - (SUGGEST_BRAND_BOOST if is_preferred(p.disc) else 0),
+                              p.score))
     return picks[:n]
 
 
-def best_next(bag, catalog, n=3, profile=None):
+def best_next(bag, catalog, n=3, profile=None, preferred_only=False):
     """The missing role whose filling would most improve THIS player's game.
 
     Ranks by practical priority first (High before Low), then by how essential the
@@ -250,7 +278,8 @@ def best_next(bag, catalog, n=3, profile=None):
         return None
     target = min(missing, key=lambda rc: (_PRIORITY_RANK[rc.priority], rc.role.priority))
     covered = [rc.role.name.lower() for rc in assessment if rc.covered]
-    candidates = suggest(target.role, bag, catalog, n)
+    candidates = suggest(target.role, bag, catalog, n, profile=profile,
+                         preferred_only=preferred_only)
 
     base = target.priority_reason or target.role.missing_reason
     if covered:
