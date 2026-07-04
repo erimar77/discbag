@@ -7,6 +7,19 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- Disc lifecycle that preserves history. Every disc has a **status** — `active` or an
+  archived state (`retired`, `lost`, `sold`, `gifted`, `broken`) with an optional reason.
+  `remove` now **archives** instead of deleting (default status `retired`; `--status` and
+  `--reason` record the story), so a disc that leaves your bag keeps its history. Archived
+  discs are excluded from the active inventory the engine reasons about (`recommend`,
+  `build-bag`, `bag`, `choose`, `chart`, `show`). New commands: `history <disc>` (full story
+  incl. status/reason/uses/rounds/practices/first & last used — spans active *and* archived),
+  `restore <disc>` (reactivate), and `delete <disc>` (the only permanent erase, with a
+  confirmation prompt and `--yes`). `list` gains `--all` and `--status` to view archived discs.
+
+### Changed
+- `round-used` is now the primary verb for recording a round; `used` is documented as its
+  alias (`practice-used` records practice). No behavior change — only naming/help clarity.
 - Player profile records a separate putting hand (`--putt-hand`, alias `--putt`) for
   players who throw with one hand and putt with the other.
 - `profile` is now a sectioned dashboard (Experience / Throwing / Performance /

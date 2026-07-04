@@ -56,7 +56,12 @@ def _print_disc_row(disc):
     plastic = f" [{disc.plastic}]" if disc.plastic else ""
     u = getattr(disc, "user", None)
     star = " ★" if u and u.favorite else ""
-    out = " (out of bag)" if u and not u.in_bag else ""
+    if u and not u.is_active:
+        out = f" ({u.status})"                       # archived: show the lifecycle status
+    elif u and not u.in_bag:
+        out = " (out of bag)"
+    else:
+        out = ""
     print(f"  {disc.brand} {disc.name}{plastic}{star}{out}".rstrip())
     role = f"  ·  {u.role}" if u and u.role else ""
     tags = f"  #{' #'.join(u.tags)}" if u and u.tags else ""
@@ -246,10 +251,72 @@ def _prompt_manual(query):
 
 
 def cmd_remove(args, inv):
+    """Archive a disc (default status: retired). It leaves the active bag but its
+    history is preserved. Use `delete` to erase permanently."""
     name = " ".join(args.name).strip()
-    n = inv.remove(name)
-    print(f"Removed {n} disc(s) matching '{name}'." if n else f"No disc named '{name}' in your bag.")
-    return 0 if n else 1
+    status = getattr(args, "status", None) or "retired"
+    reason = getattr(args, "reason", None)
+    n = inv.set_status(name, status, reason=reason, when=_now_iso())
+    if not n:
+        print(f"No disc named '{name}' in your bag.")
+        return 1
+    print(f"Disc archived.\n  Status: {status.capitalize()}")
+    if reason:
+        print(f"  Reason: {reason}")
+    return 0
+
+
+def cmd_delete(args, inv):
+    """Permanently erase a disc and all its history, after confirmation."""
+    name = " ".join(args.name).strip()
+    matches = inv.find_by_name(name)
+    if not matches:
+        print(f"No disc named '{name}' in your bag.")
+        return 1
+    if not getattr(args, "yes", False):
+        resp = input(f"This will permanently erase all history for {matches[0].name}. "
+                     "Continue? (y/N) ").strip().lower()
+        if resp not in ("y", "yes"):
+            print("Cancelled.")
+            return 1
+    n = inv.delete(name)
+    print(f"Permanently deleted {n} disc(s) matching '{name}'.")
+    return 0
+
+
+def cmd_restore(args, inv):
+    """Return an archived disc to the active bag."""
+    name = " ".join(args.name).strip()
+    n = inv.set_status(name, "active", reason=None, when=_now_iso())
+    if not n:
+        print(f"No disc named '{name}' in your history.")
+        return 1
+    print(f"Restored {n} disc(s) matching '{name}' to Active.")
+    return 0
+
+
+def cmd_history(args, inv):
+    """A disc's full story — active or archived — including its lifecycle status."""
+    name = " ".join(args.name).strip().lower()
+    matches = [d for d in inv.all_discs() if name in d.name.lower()]
+    if not matches:
+        print(f"No disc matching '{name}' in your history.")
+        return 1
+    for d in matches:
+        u = d.user
+        print(f"{d.brand} {d.name}\n")
+        print(f"  Status: {(u.status or 'active').capitalize()}")
+        print(f"  Uses: {u.use_count or 0}")
+        print(f"  Rounds: {u.round_count}")
+        print(f"  Practices: {u.practice_count}")
+        if u.first_used:
+            print(f"  First used: {u.first_used[:10]}")
+        if u.last_used:
+            print(f"  Last used: {u.last_used[:10]}")
+        if u.status_reason:
+            print(f"  Reason: {u.status_reason}")
+        print()
+    return 0
 
 
 def cmd_list(args, inv):
@@ -260,14 +327,19 @@ def cmd_list(args, inv):
         filters["favorite"] = True
     if getattr(args, "in_bag", False):
         filters["in_bag"] = True
-    discs = inv.filter(**filters) if filters else inv.list_discs()
-    discs = sorted(discs, key=lambda d: float(d.speed))
+    if getattr(args, "status", None):
+        filters["status"] = args.status
+    elif getattr(args, "all", False):
+        filters["include_archived"] = True
+    # filter() defaults to active-only, so an empty filter set still hides archived discs.
+    narrowed = any(k in filters for k in ("tag", "favorite", "in_bag", "status"))
+    discs = sorted(inv.filter(**filters), key=lambda d: float(d.speed))
     if not discs:
-        where = " matching that filter" if filters else ""
-        print(f"No discs{where}." if filters else
+        where = " matching that filter" if narrowed else ""
+        print(f"No discs{where}." if narrowed else
               "Your bag is empty. Add discs with: discbag add <name>")
         return 0
-    label = "matching" if filters else "discs"
+    label = "matching" if narrowed else "discs"
     print(f"Your bag ({len(discs)} {label}):\n")
     for d in discs:
         _print_disc_row(d)
@@ -389,7 +461,7 @@ def cmd_used(args, inv):
 
 
 def cmd_usage(args, inv):
-    discs = inv.list_discs()
+    discs = inv.all_discs()   # usage/history span every disc you've owned
     if args.disc:
         matches = [d for d in discs if args.disc.lower() in d.name.lower()]
         if not matches:
@@ -433,7 +505,8 @@ def cmd_usage(args, inv):
         days = _days_ago(d.user.last_used)
         return float("inf") if days is None else days
 
-    neglected = [d for d in discs if staleness(d) > 30]
+    # "Neglected" is actionable advice — only active discs you could actually throw.
+    neglected = [d for d in inv.list_discs() if staleness(d) > 30]
     if neglected:
         print("\nNeglected discs\n")
         for d in sorted(neglected, key=staleness, reverse=True):
@@ -915,15 +988,37 @@ def build_parser():
     p_add.add_argument("--yes", action="store_true", help="accept the best match without prompting")
     p_add.set_defaults(func=cmd_add)
 
-    p_rm = sub.add_parser("remove", help="remove a disc from your bag")
+    _ARCHIVE_STATUSES = ["retired", "lost", "sold", "gifted", "broken"]
+
+    p_rm = sub.add_parser("remove", help="archive a disc (keeps its history; use `delete` to erase)")
     p_rm.add_argument("name", nargs="+")
+    p_rm.add_argument("--status", choices=_ARCHIVE_STATUSES,
+                      help="why it left the bag (default: retired)")
+    p_rm.add_argument("--reason", help="a note, e.g. \"Lost at Woodland Park hole 18\"")
     p_rm.set_defaults(func=cmd_remove)
+
+    p_del = sub.add_parser("delete", help="permanently erase a disc and all its history")
+    p_del.add_argument("name", nargs="+")
+    p_del.add_argument("--yes", action="store_true", help="skip the confirmation prompt")
+    p_del.set_defaults(func=cmd_delete)
+
+    p_restore = sub.add_parser("restore", help="return an archived disc to the active bag")
+    p_restore.add_argument("name", nargs="+")
+    p_restore.set_defaults(func=cmd_restore)
+
+    p_hist = sub.add_parser("history", help="a disc's full story, even after it leaves the bag")
+    p_hist.add_argument("name", nargs="+")
+    p_hist.set_defaults(func=cmd_history)
 
     p_list = sub.add_parser("list", help="list discs in your bag")
     p_list.add_argument("--tag", help="only discs with this tag")
     p_list.add_argument("--favorite", action="store_true", help="only favorites")
     p_list.add_argument("--in-bag", dest="in_bag", action="store_true",
                         help="only discs currently in the bag")
+    p_list.add_argument("--status", choices=["active"] + _ARCHIVE_STATUSES,
+                        help="only discs with this lifecycle status")
+    p_list.add_argument("--all", action="store_true",
+                        help="include archived discs (lost, sold, retired, …)")
     p_list.set_defaults(func=cmd_list)
 
     p_show = sub.add_parser("show", help="show details for a disc in your bag")
@@ -958,10 +1053,10 @@ def build_parser():
     # round-used / used record a round; practice-used records a practice session.
     # use_count increments the same either way — only the session context differs.
     for cmd_name, session_type, cmd_help in [
-            ("used", "round", "record that you used these discs in a round (today, or --date)"),
-            ("round-used", "round", "record the discs you used in a round (alias of used)"),
+            ("round-used", "round", "record the discs you played in a round (today, or --date)"),
             ("practice-used", "practice",
-             "record the discs you used in a practice session (backyard, field, putting, net)")]:
+             "record the discs you used in a practice session (backyard, field, putting, net)"),
+            ("used", "round", "alias of round-used")]:
         p_used = sub.add_parser(cmd_name, help=cmd_help)
         p_used.add_argument("discs", nargs="+")
         p_used.add_argument("--date", help="record for a specific date (YYYY-MM-DD)")

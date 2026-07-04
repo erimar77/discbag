@@ -119,6 +119,27 @@ fade — an understable 13-speed needs less power than an overstable one; a very
 *estimated*; explicit per-mold overrides take precedence when present. `show` reports the
 requirement and how the disc *plays for you* at your current power.
 
+### A disc's history outlives the disc
+
+Discs tell the story of a player's development, and a lost disc is still part of that
+story. So discbag never throws history away when a disc leaves your bag. Every disc has a
+**lifecycle status** — `active`, or an archived state (`retired`, `lost`, `sold`, `gifted`,
+`broken`) with an optional reason:
+
+```text
+$ discbag remove leopard --status lost --reason "Woodland Park hole 18"
+Disc archived.
+  Status: Lost
+  Reason: Woodland Park hole 18
+```
+
+Archived discs drop out of your **active inventory** — `recommend`, `build-bag`, `bag`,
+`choose`, `chart`, and `show` only ever reason about discs still in play — but their record
+lives on. `history <disc>` recalls it forever (status, reason, uses, rounds, practices,
+first and last used), `list --all` (or `--status lost`) surfaces archived discs, and
+`restore` brings one back if you find it or trade for it again. Only `delete` truly erases a
+disc, and it asks first. `remove` is safe by default; deletion is the deliberate exception.
+
 ### Your data stays yours
 
 Each owned disc separates **manufacturer data** (mold, flight numbers, category — from the
@@ -134,10 +155,15 @@ always override the modelled behavior.
 ### Your bag
 ```bash
 discbag add <name> [--plastic --weight --color --condition --location --notes --yes]
-discbag list [--tag <t>] [--favorite] [--in-bag]
+discbag list [--tag <t>] [--favorite] [--in-bag] [--status <s>] [--all]
 discbag show <name>                 # your data + flight + role + power + how it plays for you
-discbag remove <name>
+discbag remove <name> [--status lost|sold|gifted|broken|retired] [--reason "..."]
+discbag restore <name>              # bring an archived disc back to the active bag
+discbag history <name>              # a disc's full story, even after it leaves the bag
+discbag delete <name> [--yes]       # permanently erase a disc and its history (confirms first)
 ```
+
+`remove` **archives** rather than deletes — see the disc lifecycle below.
 
 ### Personalize
 ```bash
@@ -158,8 +184,8 @@ discbag usage [<disc>]                       # per-disc, or overall (most used /
 ```
 Lightweight, session-level tracking — not throw-by-throw; it just answers *which discs did
 I use this session*. Two kinds of session are recorded separately: an actual **round**
-(`round-used`, or `used`) and **practice** (`practice-used` — backyard, field work, putting,
-net sessions). Both bump the same **use count** and set **last used**; only the session
+(`round-used`; `used` is a documented alias) and **practice** (`practice-used` — backyard,
+field work, putting, net sessions). Both bump the same **use count** and set **last used**; only the session
 context differs, so `usage` can break it down:
 
 ```text

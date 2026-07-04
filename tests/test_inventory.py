@@ -98,11 +98,73 @@ def test_add_persists_new_format(tmp_path):
     assert discs[0].user.plastic == "SS Chalky"
 
 
-def test_remove_by_mold_name(tmp_path):
+def test_delete_hard_removes_by_mold_name(tmp_path):
     inv = make_inv(tmp_path)
     inv.add(OwnedDisc.from_db_record(MAKO3))
-    assert inv.remove("mako3") == 1
+    assert inv.delete("mako3") == 1
     assert inv.list_discs() == []
+    assert inv.all_discs() == []
+
+
+# ---------- disc lifecycle (status) ----------
+
+def test_new_disc_is_active(tmp_path):
+    inv = make_inv(tmp_path)
+    inv.add(OwnedDisc.from_db_record(MAKO3))
+    assert inv.list_discs()[0].user.status == "active"
+
+
+def test_archiving_hides_from_active_but_keeps_in_all(tmp_path):
+    inv = make_inv(tmp_path)
+    inv.add(OwnedDisc.from_db_record(MAKO3))
+    inv.record_use("mako3", "2026-07-03T00:00:00+00:00")
+    assert inv.set_status("mako3", "lost", reason="Left at Woodland Park 18") == 1
+    # gone from the active inventory the engine sees...
+    assert inv.list_discs() == []
+    # ...but retained, with its history, in the full record
+    archived = inv.all_discs()
+    assert len(archived) == 1
+    u = archived[0].user
+    assert u.status == "lost"
+    assert u.status_reason == "Left at Woodland Park 18"
+    assert u.use_count == 1        # history preserved
+    assert u.in_bag is False       # archiving takes it out of the carry bag
+
+
+def test_restore_reactivates_a_disc(tmp_path):
+    inv = make_inv(tmp_path)
+    inv.add(OwnedDisc.from_db_record(MAKO3))
+    inv.set_status("mako3", "retired", reason="worn out")
+    assert inv.set_status("mako3", "active") == 1
+    assert [d.name for d in inv.list_discs()] == ["Mako3"]
+    assert inv.list_discs()[0].user.status_reason is None
+
+
+def test_delete_removes_even_when_archived(tmp_path):
+    inv = make_inv(tmp_path)
+    inv.add(OwnedDisc.from_db_record(MAKO3))
+    inv.set_status("mako3", "lost")
+    assert inv.delete("mako3") == 1        # delete reaches archived discs
+    assert inv.all_discs() == []
+
+
+def test_filter_by_status(tmp_path):
+    inv = make_inv(tmp_path)
+    inv.add(OwnedDisc.from_db_record(MAKO3))
+    inv.add(OwnedDisc.from_db_record(dict(MAKO3, name="Leopard")))
+    inv.set_status("leopard", "sold")
+    assert [d.name for d in inv.filter(status="sold")] == ["Leopard"]
+    assert [d.name for d in inv.filter()] == ["Mako3"]                 # active only
+    assert {d.name for d in inv.filter(include_archived=True)} == {"Mako3", "Leopard"}
+
+
+def test_first_used_is_earliest_entry():
+    from discbag.inventory import UserData
+    u = UserData.from_dict({"use_dates": [
+        {"date": "2026-07-03T00:00:00+00:00", "session_type": "round"},
+        {"date": "2026-05-01T00:00:00+00:00", "session_type": "practice"},
+    ]})
+    assert u.first_used == "2026-05-01T00:00:00+00:00"
 
 
 # ---------- migration from the old flat format ----------

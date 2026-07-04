@@ -124,3 +124,65 @@ def test_cmd_used_records_a_practice_session(tmp_path, capsys):
     u = inv.list_discs()[0].user
     assert u.practice_count == 1 and u.round_count == 0
     assert "practice use" in capsys.readouterr().out
+
+
+def _inv_with_mako(tmp_path):
+    from discbag import inventory
+    inv = inventory.Inventory(path=tmp_path / "inventory.json")
+    inv.add(OwnedDisc.from_db_record(MAKO3))
+    return inv
+
+
+def test_cmd_remove_archives_and_preserves_history(tmp_path, capsys):
+    inv = _inv_with_mako(tmp_path)
+    inv.record_use("mako3", "2026-07-03T00:00:00+00:00")
+    cli.cmd_remove(_ns(name=["mako3"], status="lost", reason="Left at hole 18"), inv)
+    out = capsys.readouterr().out
+    assert "archived" in out.lower() and "Lost" in out
+    assert inv.list_discs() == []                       # gone from active bag
+    assert inv.all_discs()[0].user.use_count == 1       # history kept
+
+
+def test_cmd_delete_cancelled_keeps_disc(tmp_path, capsys, monkeypatch):
+    inv = _inv_with_mako(tmp_path)
+    monkeypatch.setattr("builtins.input", lambda _="": "n")
+    rc = cli.cmd_delete(_ns(name=["mako3"], yes=False), inv)
+    assert rc == 1
+    assert len(inv.all_discs()) == 1                    # nothing erased
+
+
+def test_cmd_delete_with_yes_erases(tmp_path, capsys):
+    inv = _inv_with_mako(tmp_path)
+    inv.set_status("mako3", "lost")
+    cli.cmd_delete(_ns(name=["mako3"], yes=True), inv)
+    assert inv.all_discs() == []                        # erased even when archived
+
+
+def test_cmd_restore_reactivates(tmp_path, capsys):
+    inv = _inv_with_mako(tmp_path)
+    inv.set_status("mako3", "retired", reason="worn")
+    cli.cmd_restore(_ns(name=["mako3"]), inv)
+    assert [d.name for d in inv.list_discs()] == ["Mako3"]
+
+
+def test_cmd_history_reports_status_reason_and_sessions(tmp_path, capsys):
+    inv = _inv_with_mako(tmp_path)
+    inv.record_use("mako3", "2026-05-01T00:00:00+00:00")
+    inv.record_use("mako3", "2026-07-03T00:00:00+00:00", session_type="practice")
+    inv.set_status("mako3", "lost", reason="Woodland Park 18")
+    cli.cmd_history(_ns(name=["mako3"]), inv)
+    out = capsys.readouterr().out
+    assert "Lost" in out
+    assert "Woodland Park 18" in out
+    assert "Rounds: 1" in out and "Practices: 1" in out
+    assert "2026-05-01" in out            # first used
+
+
+def test_cmd_list_hides_archived_unless_requested(tmp_path, capsys):
+    inv = _inv_with_mako(tmp_path)
+    inv.add(OwnedDisc.from_db_record(dict(MAKO3, name="Leopard", speed=6)))
+    inv.set_status("leopard", "sold")
+    cli.cmd_list(_ns(tag=None, favorite=False, in_bag=False, status=None, all=False), inv)
+    assert "Leopard" not in capsys.readouterr().out
+    cli.cmd_list(_ns(tag=None, favorite=False, in_bag=False, status=None, all=True), inv)
+    assert "Leopard" in capsys.readouterr().out

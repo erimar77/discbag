@@ -78,6 +78,12 @@ class UserData:
     use_dates: List = field(default_factory=list)
     notes: str = ""
     personal_flight: Optional[dict] = None
+    # Lifecycle: "active" (in the working bag) or an archived status (lost, sold,
+    # gifted, broken, retired). Archived discs keep their history but leave the
+    # active inventory the engine reasons about. status_reason tells the story.
+    status: str = "active"
+    status_reason: Optional[str] = None
+    status_date: Optional[str] = None
 
     @classmethod
     def from_dict(cls, data):
@@ -119,6 +125,15 @@ class UserData:
     @property
     def last_practice(self):
         return self._last_of("practice")
+
+    @property
+    def first_used(self):
+        dates = [e["date"] for e in self.uses if e["date"]]
+        return min(dates) if dates else None
+
+    @property
+    def is_active(self):
+        return (self.status or "active") == "active"
 
 
 @dataclass
@@ -254,8 +269,9 @@ class Inventory:
         self._save()
         return disc
 
-    def remove(self, name):
-        """Remove all discs whose mold matches name (case-insensitive). Returns count."""
+    def delete(self, name):
+        """Permanently remove all discs whose mold matches name (case-insensitive),
+        history and all — active or archived. Returns count."""
         target = name.strip().lower()
         before = len(self._discs)
         self._discs = [d for d in self._discs if d.mold.strip().lower() != target]
@@ -265,6 +281,12 @@ class Inventory:
         return removed
 
     def list_discs(self):
+        """The active inventory — discs still in play. Archived discs are excluded;
+        this is what every recommendation/analysis command reasons about."""
+        return [d for d in self._discs if d.user.is_active]
+
+    def all_discs(self):
+        """Every disc ever owned, active and archived — for history and lifecycle."""
         return list(self._discs)
 
     def refresh_manufacturer(self, db_discs):
@@ -281,10 +303,20 @@ class Inventory:
         target = name.strip().lower()
         return [d for d in self._discs if d.mold.strip().lower() == target]
 
-    def filter(self, tag=None, favorite=None, in_bag=None):
-        """Owned discs matching the given user-data filters (any combination)."""
+    def filter(self, tag=None, favorite=None, in_bag=None,
+               status=None, include_archived=False):
+        """Owned discs matching the given user-data filters (any combination).
+
+        By default only active discs are returned. Pass ``status`` to select a
+        specific lifecycle status, or ``include_archived=True`` for every disc.
+        """
         out = []
         for d in self._discs:
+            if status is not None:
+                if (d.user.status or "active") != status:
+                    continue
+            elif not include_archived and not d.user.is_active:
+                continue
             if tag is not None and tag not in d.user.tags:
                 continue
             if favorite is not None and d.user.favorite != favorite:
@@ -328,6 +360,18 @@ class Inventory:
 
     def set_personal_flight(self, name, personal):
         return self._mutate(name, lambda u: setattr(u, "personal_flight", personal))
+
+    def set_status(self, name, status, reason=None, when=None):
+        """Set a disc's lifecycle status (e.g. active, retired, lost, sold). Archiving
+        (any non-active status) removes it from the carry bag but keeps its history.
+        Returns discs updated. Reaches archived discs too (for restore)."""
+        def apply(u):
+            u.status = status
+            u.status_reason = reason
+            u.status_date = when
+            if status != "active":
+                u.in_bag = False
+        return self._mutate(name, apply)
 
     def record_use(self, name, when, session_type="round"):
         """Record that a disc was used at timestamp `when` in a session of the given
