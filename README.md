@@ -93,7 +93,7 @@ reference lives behind `discbag --help`, organized by purpose (Common / Organiza
 Analysis / Advanced).
 
 In an interactive terminal the dashboard is colorized — a cyan title rule, and each section
-keyed by an icon and hue (cyan Inventory, purple Player, yellow Recent Activity, green
+keyed by an icon and hue (cyan Inventory, light-purple Player, yellow Recent Activity, green
 Suggestions) — with the numbers and key stats highlighted. When output is piped or redirected,
 or when `NO_COLOR` is set, it degrades to the plain, parseable text above.
 
