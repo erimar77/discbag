@@ -207,8 +207,8 @@ Select a disc [1-2] (blank to cancel):
 If only one disc matches, the command just runs. If several match, you're asked which — using
 whatever tells them apart (plastic, weight, color, condition, purchase date, notes). When
 there's no terminal to ask (a script or pipe), an ambiguous name is a hard error listing the
-matches, never a guess. The bulk-friendly commands — `tag`, `untag`, `favorite` — take
-`--all` to act on every copy at once. Recommendations already evaluate each physical disc
+matches, never a guess. The bulk-friendly commands — `tag`, `untag`, `favorite`, `sync` —
+take `--all` to act on every copy at once. Recommendations already evaluate each physical disc
 independently, so two Eagles with different wear or personal flight notes can legitimately
 earn different advice.
 
@@ -246,7 +246,7 @@ discbag bag add|remove|list         # which owned discs you currently carry
 discbag flight <disc> 6/5/-1/2 [--distance 255] [--confidence 5]   # how it flies for YOU
 ```
 When you own more than one of a mold, single-disc commands ask which copy you mean;
-`--all` (on `tag`/`untag`/`favorite`) applies to every copy at once.
+`--all` (on `tag`/`untag`/`favorite`/`sync`) applies to every copy at once.
 
 ### Use tracking
 ```bash
@@ -325,7 +325,7 @@ discbag chart [--type flight|grid|stability|speed|composition|brands]
 ### Data
 ```bash
 discbag updatedb                    # refresh the disc database from the source
-discbag sync                        # refresh your discs' cached stats (keeps your data)
+discbag sync [<disc>] [--all]       # refresh cached stats (whole bag, or one disc/mold; keeps your data)
 discbag db-info                     # database size and age
 ```
 

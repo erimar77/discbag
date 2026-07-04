@@ -437,8 +437,18 @@ def cmd_show(args, inv):
 
 
 def cmd_sync(args, inv):
-    data = db.load_db()
-    n = inv.refresh_manufacturer(data.get("discs", []))
+    catalog = db.load_db().get("discs", [])
+    name = getattr(args, "disc", None)
+    if name:
+        # A bulk-friendly command: resolve to one disc, or every copy with --all.
+        targets = _resolve(inv, name, args=args, include_archived=True, allow_all=True)
+        if targets is None:
+            return 1
+        inv.refresh_manufacturer(catalog, discs=targets)
+        scope = targets[0].name if len(targets) == 1 else f"{len(targets)} '{name}' discs"
+        print(f"Refreshed manufacturer data for {scope}. Your personal data was left untouched.")
+        return 0
+    n = inv.refresh_manufacturer(catalog)
     print(f"Refreshed manufacturer data for {n} disc(s) from the database. "
           "Your personal data was left untouched.")
     return 0
@@ -1374,8 +1384,11 @@ def build_parser():
 
     sub.add_parser("updatedb", help="refresh the disc database").set_defaults(func=cmd_updatedb)
     sub.add_parser("db-info", help="show database size and age").set_defaults(func=cmd_dbinfo)
-    sub.add_parser("sync", help="refresh your discs' cached manufacturer data from the database"
-                   ).set_defaults(func=cmd_sync)
+    p_sync = sub.add_parser("sync",
+                            help="refresh your discs' cached manufacturer data from the database")
+    p_sync.add_argument("disc", nargs="?", help="a disc to refresh; omit to refresh the whole bag")
+    p_sync.add_argument("--all", action="store_true", help="refresh every copy of the mold")
+    p_sync.set_defaults(func=cmd_sync)
 
     p_bag = sub.add_parser("build-bag", help="recommend a bag by role from your inventory")
     p_bag.add_argument("--size", "-n", type=int, help="limit to this many discs")

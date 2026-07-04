@@ -317,9 +317,11 @@ class Inventory:
         """Every disc ever owned, active and archived — for history and lifecycle."""
         return list(self._discs)
 
-    def refresh_manufacturer(self, db_discs):
-        """Refresh every disc's cached mold snapshot from the DB. Returns count updated."""
-        updated = sum(1 for d in self._discs if d.refresh_from_db(db_discs))
+    def refresh_manufacturer(self, db_discs, discs=None):
+        """Refresh cached mold snapshots from the DB. Refreshes every owned disc by
+        default, or only the given subset. Returns count updated."""
+        targets = self._discs if discs is None else discs
+        updated = sum(1 for d in targets if d.refresh_from_db(db_discs))
         if updated:
             self._save()
         return updated

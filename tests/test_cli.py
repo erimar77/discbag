@@ -352,3 +352,29 @@ def test_remove_archives_only_the_chosen_copy(tmp_path, monkeypatch):
     archived = [d for d in inv.all_discs() if not d.user.is_active]
     assert [d.user.plastic for d in active] == ["Star"]
     assert [d.user.plastic for d in archived] == ["Champion"]
+
+
+def test_sync_targets_only_the_resolved_disc(tmp_path, monkeypatch):
+    inv = _bag(tmp_path, MAKO3, dict(MAKO3, name="Leopard", speed=6, fade=1))
+    monkeypatch.setattr(cli.db, "load_db",
+                        lambda: {"discs": [dict(MAKO3, fade=2), dict(MAKO3, name="Leopard", speed=6, fade=4)]})
+    cli.cmd_sync(_ns(disc="mako3", all=False), inv)
+    by = {d.name: d.fade for d in inv.list_discs()}
+    assert by["Mako3"] == 2      # refreshed
+    assert by["Leopard"] == 1    # untouched — not targeted
+
+
+def test_sync_all_refreshes_every_copy(tmp_path, monkeypatch):
+    inv = _two_roadrunners(tmp_path)
+    monkeypatch.setattr(cli.db, "load_db", lambda: {"discs": [dict(ROAD, fade=3)]})
+    cli.cmd_sync(_ns(disc="roadrunner", all=True), inv)
+    assert all(d.fade == 3 for d in inv.list_discs())
+
+
+def test_sync_no_arg_refreshes_whole_bag(tmp_path, monkeypatch):
+    inv = _bag(tmp_path, MAKO3, dict(MAKO3, name="Leopard", speed=6, fade=1))
+    monkeypatch.setattr(cli.db, "load_db",
+                        lambda: {"discs": [dict(MAKO3, fade=2), dict(MAKO3, name="Leopard", speed=6, fade=4)]})
+    cli.cmd_sync(_ns(disc=None, all=False), inv)
+    fades = sorted(d.fade for d in inv.list_discs())
+    assert fades == [2, 4]

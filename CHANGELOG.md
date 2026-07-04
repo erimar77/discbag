@@ -14,8 +14,9 @@ All notable changes to this project are documented here. The format is based on
   `round-used`/`practice-used`) resolve a typed name to one physical disc: a single match runs
   as before, multiple matches prompt (showing plastic/weight/color/etc. to tell them apart),
   and an ambiguous name is a hard error — never a guess — when there's no terminal to ask.
-  Bulk-friendly commands (`tag`, `untag`, `favorite`) take `--all` to act on every copy. IDs
-  are internal; users never see or type them. Recommendations are unchanged — they already
+  Bulk-friendly commands (`tag`, `untag`, `favorite`, `sync`) take `--all` to act on every
+  copy; `sync` also accepts an optional disc to refresh just that disc/mold. IDs are internal;
+  users never see or type them. Recommendations are unchanged — they already
   evaluate each physical disc independently.
 - A home-screen dashboard. Running `discbag` with no arguments now prints a glanceable
   summary — inventory counts, your profile and estimated arm power, latest round/practice,
