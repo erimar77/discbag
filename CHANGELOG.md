@@ -7,6 +7,16 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- Individual disc identity. Every disc gets a permanent internal id when added (existing
+  inventories are migrated automatically, no interaction needed), so two copies of the same
+  mold keep separate histories, lifecycle, favorites, notes, and flight. Single-disc commands
+  (`show`, `remove`, `delete`, `restore`, `history`, `role`, `flight`, `usage`,
+  `round-used`/`practice-used`) resolve a typed name to one physical disc: a single match runs
+  as before, multiple matches prompt (showing plastic/weight/color/etc. to tell them apart),
+  and an ambiguous name is a hard error — never a guess — when there's no terminal to ask.
+  Bulk-friendly commands (`tag`, `untag`, `favorite`) take `--all` to act on every copy. IDs
+  are internal; users never see or type them. Recommendations are unchanged — they already
+  evaluate each physical disc independently.
 - A home-screen dashboard. Running `discbag` with no arguments now prints a glanceable
   summary — inventory counts, your profile and estimated arm power, latest round/practice,
   and lightweight suggestions (practice discs, missing roles, neglected discs) — instead of

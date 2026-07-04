@@ -185,11 +185,38 @@ first and last used), `list --all` (or `--status lost`) surfaces archived discs,
 `restore` brings one back if you find it or trade for it again. Only `delete` truly erases a
 disc, and it asks first. `remove` is safe by default; deletion is the deliberate exception.
 
+### Two of the same mold are two different discs
+
+A mold is a product; a disc is a physical object. Your two Roadrunners each develop their
+own wear, flight, history, and confidence, so `discbag` gives every disc a permanent
+internal identity when you add it and keeps those histories apart. You never see or type
+that identity — the experience stays natural:
+
+```text
+$ discbag show roadrunner
+Multiple discs match 'roadrunner':
+
+  1) Innova Roadrunner
+     Champion, 171g, added 2026-06-14
+  2) Innova Roadrunner
+     Star, 163g
+
+Select a disc [1-2] (blank to cancel):
+```
+
+If only one disc matches, the command just runs. If several match, you're asked which — using
+whatever tells them apart (plastic, weight, color, condition, purchase date, notes). When
+there's no terminal to ask (a script or pipe), an ambiguous name is a hard error listing the
+matches, never a guess. The bulk-friendly commands — `tag`, `untag`, `favorite` — take
+`--all` to act on every copy at once. Recommendations already evaluate each physical disc
+independently, so two Eagles with different wear or personal flight notes can legitimately
+earn different advice.
+
 ### Your data stays yours
 
 Each owned disc separates **manufacturer data** (mold, flight numbers, category — from the
 database) from **your data** (plastic, weight, color, condition, purchase location, date
-added, favorite, tags, personal role, throw count, notes, personal flight numbers).
+added, favorite, tags, personal role, use history, notes, personal flight numbers).
 Refreshing the database never touches your personal data. Recorded personal flight numbers
 always override the modelled behavior.
 
@@ -212,12 +239,14 @@ discbag delete <name> [--yes]       # permanently erase a disc and its history (
 
 ### Personalize
 ```bash
-discbag tag <disc> <tag>            # untag <disc> <tag> to remove
+discbag tag <disc> <tag> [--all]    # untag <disc> <tag> [--all] to remove
 discbag role <disc> "hyzer flip"    # a personal role label
-discbag favorite <disc> [--unset]
+discbag favorite <disc> [--unset] [--all]
 discbag bag add|remove|list         # which owned discs you currently carry
 discbag flight <disc> 6/5/-1/2 [--distance 255] [--confidence 5]   # how it flies for YOU
 ```
+When you own more than one of a mold, single-disc commands ask which copy you mean;
+`--all` (on `tag`/`untag`/`favorite`) applies to every copy at once.
 
 ### Use tracking
 ```bash

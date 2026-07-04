@@ -98,6 +98,68 @@ def test_add_persists_new_format(tmp_path):
     assert discs[0].user.plastic == "SS Chalky"
 
 
+# ---------- per-disc identity (multiple copies of a mold) ----------
+
+def test_add_assigns_a_unique_id(tmp_path):
+    inv = make_inv(tmp_path)
+    a = inv.add(OwnedDisc.from_db_record(MAKO3))
+    b = inv.add(OwnedDisc.from_db_record(MAKO3))
+    assert a.id and b.id and a.id != b.id
+
+
+def test_ids_persist_across_reload(tmp_path):
+    path = tmp_path / "inventory.json"
+    inv = inventory.Inventory(path=path)
+    orig = inv.add(OwnedDisc.from_db_record(MAKO3)).id
+    assert inventory.Inventory(path=path).list_discs()[0].id == orig
+
+
+def test_load_backfills_missing_ids(tmp_path):
+    path = tmp_path / "inventory.json"
+    rec = OwnedDisc.from_db_record(MAKO3).to_dict()
+    rec.pop("id", None)                          # legacy record without an id
+    path.write_text(json.dumps([rec]))
+    d = inventory.Inventory(path=path).list_discs()[0]
+    assert d.id
+    assert json.loads(path.read_text())[0]["id"] == d.id   # persisted
+
+
+def test_match_prefers_exact_then_falls_back_to_substring(tmp_path):
+    inv = make_inv(tmp_path)
+    inv.add(OwnedDisc.from_db_record(dict(MAKO3, name="Eagle")))
+    inv.add(OwnedDisc.from_db_record(dict(MAKO3, name="EagleX")))
+    assert [d.name for d in inv.match("eagle")] == ["Eagle"]         # exact wins
+    assert {d.name for d in inv.match("eag")} == {"Eagle", "EagleX"} # else substring
+
+
+def test_mutation_on_one_disc_leaves_its_twin_untouched(tmp_path):
+    inv = make_inv(tmp_path)
+    r1 = inv.add(OwnedDisc.from_db_record(dict(MAKO3, name="Roadrunner"), plastic="Champion"))
+    r2 = inv.add(OwnedDisc.from_db_record(dict(MAKO3, name="Roadrunner"), plastic="Star"))
+    assert inv.set_favorite(r1, True) == 1       # passing the disc targets that copy
+    assert r1.user.favorite is True and r2.user.favorite is False
+    reloaded = inventory.Inventory(path=inv.path)
+    favs = [d for d in reloaded.list_discs() if d.user.favorite]
+    assert [d.user.plastic for d in favs] == ["Champion"]
+
+
+def test_mutation_by_name_still_hits_all_copies(tmp_path):
+    # Back-compat / bulk: a mold-name string targets every matching copy.
+    inv = make_inv(tmp_path)
+    inv.add(OwnedDisc.from_db_record(dict(MAKO3, name="Roadrunner"), plastic="Champion"))
+    inv.add(OwnedDisc.from_db_record(dict(MAKO3, name="Roadrunner"), plastic="Star"))
+    assert inv.add_tag("roadrunner", "beat-in") == 2
+
+
+def test_delete_one_disc_by_identity(tmp_path):
+    inv = make_inv(tmp_path)
+    keep = inv.add(OwnedDisc.from_db_record(dict(MAKO3, name="Roadrunner"), plastic="Champion"))
+    drop = inv.add(OwnedDisc.from_db_record(dict(MAKO3, name="Roadrunner"), plastic="Star"))
+    assert inv.delete(drop) == 1
+    remaining = inv.all_discs()
+    assert len(remaining) == 1 and remaining[0].id == keep.id
+
+
 def test_delete_hard_removes_by_mold_name(tmp_path):
     inv = make_inv(tmp_path)
     inv.add(OwnedDisc.from_db_record(MAKO3))

@@ -12,9 +12,14 @@ snapshot is updated (see ``OwnedDisc.refresh_from_db``).
 
 import json
 import os
+import uuid
 from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 from typing import List, Optional
+
+
+def _new_id():
+    return uuid.uuid4().hex
 
 RUNTIME_DIR = Path(os.path.expanduser("~")) / ".discbag"
 RUNTIME_INVENTORY_PATH = RUNTIME_DIR / "inventory.json"
@@ -144,6 +149,9 @@ class OwnedDisc:
     mold: str
     cached: Disc
     user: UserData = field(default_factory=UserData)
+    # A permanent per-copy identifier so two discs of the same mold keep separate
+    # histories. Assigned on add; an internal detail users never see or type.
+    id: str = ""
 
     # --- manufacturer accessors delegate to the cached mold snapshot ---
     @property
@@ -204,10 +212,11 @@ class OwnedDisc:
             mold=data.get("mold", ""),
             cached=Disc.from_dict(data.get("cached", {})),
             user=UserData.from_dict(data.get("user", {})),
+            id=data.get("id", ""),
         )
 
     def to_dict(self):
-        return {"brand": self.brand, "mold": self.mold,
+        return {"id": self.id, "brand": self.brand, "mold": self.mold,
                 "cached": self.cached.to_dict(), "user": self.user.to_dict()}
 
     def refresh_from_db(self, db_discs):
@@ -254,9 +263,24 @@ class Inventory:
             discs = [_migrate_flat(d) if _is_old_flat_record(d) else OwnedDisc.from_dict(d)
                      for d in raw]
             self._discs = discs
+            self._backfill_ids()
             self._save()
             return discs
-        return [OwnedDisc.from_dict(d) for d in raw]
+        discs = [OwnedDisc.from_dict(d) for d in raw]
+        self._discs = discs
+        # Backfill ids onto any pre-identity discs; persist only if something changed.
+        if self._backfill_ids():
+            self._save()
+        return discs
+
+    def _backfill_ids(self):
+        """Give every disc a permanent id. Returns True if any were assigned."""
+        assigned = False
+        for d in self._discs:
+            if not d.id:
+                d.id = _new_id()
+                assigned = True
+        return assigned
 
     def _save(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -265,16 +289,20 @@ class Inventory:
         os.replace(tmp, self.path)
 
     def add(self, disc):
+        if not disc.id:
+            disc.id = _new_id()
         self._discs.append(disc)
         self._save()
         return disc
 
-    def delete(self, name):
-        """Permanently remove all discs whose mold matches name (case-insensitive),
-        history and all — active or archived. Returns count."""
-        target = name.strip().lower()
+    def delete(self, target):
+        """Permanently remove a disc and its history — active or archived. `target`
+        may be a single OwnedDisc (that copy only) or a mold-name string (every
+        matching copy, for back-compat/bulk). Returns count removed."""
+        victims = self._targets(target)
+        ids = {id(d) for d in victims}
         before = len(self._discs)
-        self._discs = [d for d in self._discs if d.mold.strip().lower() != target]
+        self._discs = [d for d in self._discs if id(d) not in ids]
         removed = before - len(self._discs)
         if removed:
             self._save()
@@ -299,9 +327,32 @@ class Inventory:
     # --- lookup & filtering ---
 
     def find_by_name(self, name):
-        """All owned discs whose mold matches `name` (case-insensitive)."""
+        """All owned discs whose mold matches `name` exactly (case-insensitive)."""
         target = name.strip().lower()
         return [d for d in self._discs if d.mold.strip().lower() == target]
+
+    def find_by_id(self, disc_id):
+        for d in self._discs:
+            if d.id == disc_id:
+                return d
+        return None
+
+    def match(self, name, include_archived=True):
+        """Resolve a user-typed name to candidate discs: an exact mold match if any,
+        otherwise a substring match. Used to disambiguate multiple physical copies."""
+        pool = self._discs if include_archived else [d for d in self._discs if d.user.is_active]
+        target = name.strip().lower()
+        exact = [d for d in pool if d.mold.strip().lower() == target]
+        if exact:
+            return exact
+        return [d for d in pool if target in d.mold.strip().lower()]
+
+    def _targets(self, target):
+        """Normalize a mutation target to a list of discs. An OwnedDisc targets that
+        one copy; a string targets every copy of the mold (back-compat / bulk)."""
+        if isinstance(target, OwnedDisc):
+            return [target]
+        return self.find_by_name(target)
 
     def filter(self, tag=None, favorite=None, in_bag=None,
                status=None, include_archived=False):
@@ -328,9 +379,10 @@ class Inventory:
 
     # --- user-data mutations (operate on every disc of a mold) ---
 
-    def _mutate(self, name, fn):
-        """Apply fn to each matching disc, save if any matched, return count."""
-        matches = self.find_by_name(name)
+    def _mutate(self, target, fn):
+        """Apply fn to each targeted disc's user data, save if any matched, return count.
+        `target` is an OwnedDisc (one copy) or a mold-name string (all copies)."""
+        matches = self._targets(target)
         for d in matches:
             fn(d.user)
         if matches:

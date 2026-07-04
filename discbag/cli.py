@@ -254,16 +254,91 @@ def _prompt_manual(query):
     }
 
 
+# ---------- resolving a typed name to a specific physical disc ----------
+
+def _disc_descriptor(disc):
+    """Short, human distinguishing details for one physical disc, for disambiguation."""
+    u = disc.user
+    bits = []
+    if u.plastic:
+        bits.append(u.plastic)
+    if u.weight:
+        bits.append(f"{u.weight}g")
+    if u.color:
+        bits.append(u.color)
+    if u.condition:
+        bits.append(u.condition)
+    if u.purchase_location:
+        bits.append(u.purchase_location)
+    if u.date_added:
+        bits.append(f"added {str(u.date_added)[:10]}")
+    if not u.is_active:
+        bits.append(u.status)
+    if u.notes:
+        bits.append(u.notes)
+    return ", ".join(bits) if bits else "no distinguishing details"
+
+
+def _print_matches(name, matches):
+    print(f"Multiple discs match '{name}':\n")
+    for i, d in enumerate(matches, 1):
+        print(f"  {i}) {d.brand} {d.name}")
+        print(f"     {_disc_descriptor(d)}")
+
+
+def _prompt_for_disc(name, matches):
+    _print_matches(name, matches)
+    print()
+    while True:
+        try:
+            raw = input(f"Select a disc [1-{len(matches)}] (blank to cancel): ").strip()
+        except EOFError:
+            return None
+        if not raw:
+            print("Cancelled.")
+            return None
+        if raw.isdigit() and 1 <= int(raw) <= len(matches):
+            return matches[int(raw) - 1]
+        print(f"Please enter a number from 1 to {len(matches)}.")
+
+
+def _resolve(inv, name, args=None, include_archived=False, allow_all=False):
+    """Resolve a user-typed disc name to the physical disc(s) to act on.
+
+    Returns a list of discs (one, or several only when a bulk command is given --all),
+    or None when unresolved (a message is printed). A single match never prompts. An
+    ambiguous name prompts in a terminal, but is a hard error when non-interactive —
+    we never guess which physical disc was meant.
+    """
+    matches = inv.match(name, include_archived=include_archived)
+    if not matches:
+        print(f"No disc named '{name}' in your bag.", file=sys.stderr)
+        return None
+    if len(matches) == 1:
+        return matches
+    if allow_all and getattr(args, "all", False):
+        return matches
+    if not sys.stdin.isatty():
+        _print_matches(name, matches)
+        extra = ", or pass --all to apply to every copy" if allow_all else ""
+        print(f"\n'{name}' matches {len(matches)} discs — "
+              f"re-run in a terminal to choose{extra}.", file=sys.stderr)
+        return None
+    chosen = _prompt_for_disc(name, matches)
+    return [chosen] if chosen else None
+
+
 def cmd_remove(args, inv):
     """Archive a disc (default status: retired). It leaves the active bag but its
     history is preserved. Use `delete` to erase permanently."""
     name = " ".join(args.name).strip()
+    targets = _resolve(inv, name)
+    if targets is None:
+        return 1
+    disc = targets[0]
     status = getattr(args, "status", None) or "retired"
     reason = getattr(args, "reason", None)
-    n = inv.set_status(name, status, reason=reason, when=_now_iso())
-    if not n:
-        print(f"No disc named '{name}' in your bag.")
-        return 1
+    inv.set_status(disc, status, reason=reason, when=_now_iso())
     print(f"Disc archived.\n  Status: {status.capitalize()}")
     if reason:
         print(f"  Reason: {reason}")
@@ -273,53 +348,53 @@ def cmd_remove(args, inv):
 def cmd_delete(args, inv):
     """Permanently erase a disc and all its history, after confirmation."""
     name = " ".join(args.name).strip()
-    matches = inv.find_by_name(name)
-    if not matches:
-        print(f"No disc named '{name}' in your bag.")
+    targets = _resolve(inv, name, include_archived=True)
+    if targets is None:
         return 1
+    disc = targets[0]
     if not getattr(args, "yes", False):
-        resp = input(f"This will permanently erase all history for {matches[0].name}. "
-                     "Continue? (y/N) ").strip().lower()
+        resp = input(f"This will permanently erase all history for {disc.brand} {disc.name} "
+                     f"({_disc_descriptor(disc)}). Continue? (y/N) ").strip().lower()
         if resp not in ("y", "yes"):
             print("Cancelled.")
             return 1
-    n = inv.delete(name)
-    print(f"Permanently deleted {n} disc(s) matching '{name}'.")
+    inv.delete(disc)
+    print(f"Permanently deleted {disc.brand} {disc.name}.")
     return 0
 
 
 def cmd_restore(args, inv):
     """Return an archived disc to the active bag."""
     name = " ".join(args.name).strip()
-    n = inv.set_status(name, "active", reason=None, when=_now_iso())
-    if not n:
-        print(f"No disc named '{name}' in your history.")
+    targets = _resolve(inv, name, include_archived=True)
+    if targets is None:
         return 1
-    print(f"Restored {n} disc(s) matching '{name}' to Active.")
+    disc = targets[0]
+    inv.set_status(disc, "active", reason=None, when=_now_iso())
+    print(f"Restored {disc.brand} {disc.name} to Active.")
     return 0
 
 
 def cmd_history(args, inv):
     """A disc's full story — active or archived — including its lifecycle status."""
-    name = " ".join(args.name).strip().lower()
-    matches = [d for d in inv.all_discs() if name in d.name.lower()]
-    if not matches:
-        print(f"No disc matching '{name}' in your history.")
+    name = " ".join(args.name).strip()
+    targets = _resolve(inv, name, include_archived=True)
+    if targets is None:
         return 1
-    for d in matches:
-        u = d.user
-        print(f"{d.brand} {d.name}\n")
-        print(f"  Status: {(u.status or 'active').capitalize()}")
-        print(f"  Uses: {u.use_count or 0}")
-        print(f"  Rounds: {u.round_count}")
-        print(f"  Practices: {u.practice_count}")
-        if u.first_used:
-            print(f"  First used: {u.first_used[:10]}")
-        if u.last_used:
-            print(f"  Last used: {u.last_used[:10]}")
-        if u.status_reason:
-            print(f"  Reason: {u.status_reason}")
-        print()
+    d = targets[0]
+    u = d.user
+    print(f"{d.brand} {d.name}\n")
+    print(f"  Status: {(u.status or 'active').capitalize()}")
+    print(f"  Uses: {u.use_count or 0}")
+    print(f"  Rounds: {u.round_count}")
+    print(f"  Practices: {u.practice_count}")
+    if u.first_used:
+        print(f"  First used: {u.first_used[:10]}")
+    if u.last_used:
+        print(f"  Last used: {u.last_used[:10]}")
+    if u.status_reason:
+        print(f"  Reason: {u.status_reason}")
+    print()
     return 0
 
 
@@ -351,15 +426,13 @@ def cmd_list(args, inv):
 
 
 def cmd_show(args, inv):
-    name = " ".join(args.name).strip().lower()
-    matches = [d for d in inv.list_discs() if name in d.name.lower()]
-    if not matches:
-        print(f"No disc matching '{name}' in your bag.")
+    name = " ".join(args.name).strip()
+    targets = _resolve(inv, name)
+    if targets is None:
         return 1
     prof = player.load_profile()
-    for d in matches:
-        print(format_owned(d, profile=prof))
-        print()
+    print(format_owned(targets[0], profile=prof))
+    print()
     return 0
 
 
@@ -377,39 +450,43 @@ def _not_found(name):
 
 
 def cmd_tag(args, inv):
-    name, tag = args.disc, args.tag
-    n = inv.add_tag(name, tag)
-    if not n:
-        return _not_found(name)
-    print(f"Tagged {n} {name} disc(s) with '{tag}'.")
+    targets = _resolve(inv, args.disc, args=args, allow_all=True)
+    if targets is None:
+        return 1
+    for d in targets:
+        inv.add_tag(d, args.tag)
+    print(f"Tagged {len(targets)} disc(s) with '{args.tag}'.")
     return 0
 
 
 def cmd_untag(args, inv):
-    name, tag = args.disc, args.tag
-    n = inv.remove_tag(name, tag)
-    if not n:
-        return _not_found(name)
-    print(f"Removed tag '{tag}' from {n} {name} disc(s).")
+    targets = _resolve(inv, args.disc, args=args, allow_all=True)
+    if targets is None:
+        return 1
+    for d in targets:
+        inv.remove_tag(d, args.tag)
+    print(f"Removed tag '{args.tag}' from {len(targets)} disc(s).")
     return 0
 
 
 def cmd_role(args, inv):
-    name, role = args.disc, " ".join(args.role)
-    n = inv.set_role(name, role)
-    if not n:
-        return _not_found(name)
-    print(f"Set role of {n} {name} disc(s) to '{role}'.")
+    targets = _resolve(inv, args.disc)
+    if targets is None:
+        return 1
+    role = " ".join(args.role)
+    inv.set_role(targets[0], role)
+    print(f"Set role of {targets[0].name} to '{role}'.")
     return 0
 
 
 def cmd_favorite(args, inv):
-    name = args.disc
+    targets = _resolve(inv, args.disc, args=args, allow_all=True)
+    if targets is None:
+        return 1
     value = not args.unset
-    n = inv.set_favorite(name, value)
-    if not n:
-        return _not_found(name)
-    print(f"{'Marked' if value else 'Unmarked'} {n} {name} disc(s) "
+    for d in targets:
+        inv.set_favorite(d, value)
+    print(f"{'Marked' if value else 'Unmarked'} {len(targets)} disc(s) "
           f"as {'a favorite' if value else 'not a favorite'}.")
     return 0
 
@@ -453,15 +530,20 @@ def _days_ago(when, now_iso=None):
 def cmd_used(args, inv):
     when = args.date or _now_iso()
     session_type = getattr(args, "session_type", "round")
-    recorded, missing = [], []
+    # Resolve every named disc first (prompting/erroring as needed) so recording is
+    # all-or-nothing — a use is attached to one specific physical disc.
+    resolved = []
     for name in args.discs:
-        (recorded if inv.record_use(name, when, session_type) else missing).append(name)
-    if recorded:
-        label = "practice" if session_type == "practice" else "round"
-        print(f"Recorded {label} use ({when[:10]}) for: {', '.join(recorded)}.")
-    for name in missing:
-        print(f"No disc named '{name}' in your bag.", file=sys.stderr)
-    return 0 if recorded else 1
+        targets = _resolve(inv, name)
+        if targets is None:
+            return 1
+        resolved.append(targets[0])
+    for disc in resolved:
+        inv.record_use(disc, when, session_type)
+    label = "practice" if session_type == "practice" else "round"
+    print(f"Recorded {label} use ({when[:10]}) for: "
+          f"{', '.join(d.name for d in resolved)}.")
+    return 0
 
 
 def _staleness(disc):
@@ -479,35 +561,34 @@ def _neglected(discs, threshold=30):
 
 
 def cmd_usage(args, inv):
-    discs = inv.all_discs()   # usage/history span every disc you've owned
     if args.disc:
-        matches = [d for d in discs if args.disc.lower() in d.name.lower()]
-        if not matches:
-            print(f"No disc matching '{args.disc}' in your bag.")
+        targets = _resolve(inv, args.disc, include_archived=True)
+        if targets is None:
             return 1
-        for d in matches:
-            u = d.user
-            print(f"{d.brand} {d.name}\n")
-            print(f"  Use count: {u.use_count or 0}")
-            if u.last_used:
-                days = _days_ago(u.last_used)
-                ago = "today" if days == 0 else f"{days} days ago"
-                print(f"  Last used: {u.last_used[:10]} ({ago})")
-                print(f"  Recently used: {'Yes' if days is not None and days <= 30 else 'No'}")
-            else:
-                print("  Last used: never")
-                print("  Recently used: No")
-            # Break the count down by session type when either kind is on record.
-            if u.round_count or u.practice_count:
-                print(f"  Rounds: {u.round_count}")
-                print(f"  Practices: {u.practice_count}")
-                if u.last_round:
-                    print(f"  Last round: {u.last_round[:10]}")
-                if u.last_practice:
-                    print(f"  Last practice: {u.last_practice[:10]}")
-            print()
+        d = targets[0]
+        u = d.user
+        print(f"{d.brand} {d.name}\n")
+        print(f"  Use count: {u.use_count or 0}")
+        if u.last_used:
+            days = _days_ago(u.last_used)
+            ago = "today" if days == 0 else f"{days} days ago"
+            print(f"  Last used: {u.last_used[:10]} ({ago})")
+            print(f"  Recently used: {'Yes' if days is not None and days <= 30 else 'No'}")
+        else:
+            print("  Last used: never")
+            print("  Recently used: No")
+        # Break the count down by session type when either kind is on record.
+        if u.round_count or u.practice_count:
+            print(f"  Rounds: {u.round_count}")
+            print(f"  Practices: {u.practice_count}")
+            if u.last_round:
+                print(f"  Last round: {u.last_round[:10]}")
+            if u.last_practice:
+                print(f"  Last practice: {u.last_practice[:10]}")
+        print()
         return 0
 
+    discs = inv.all_discs()   # overall stats span every disc you've owned
     used = sorted((d for d in discs if d.user.use_count), key=lambda d: -d.user.use_count)
     print("Most used discs\n")
     if used:
@@ -1102,10 +1183,14 @@ def cmd_dashboard(args, inv):
 
 
 def cmd_flight(args, inv):
-    name = args.disc
+    targets = _resolve(inv, args.disc)
+    if targets is None:
+        return 1
+    disc = targets[0]
     if args.clear:
-        n = inv.set_personal_flight(name, None)
-        return _not_found(name) if not n else (print(f"Cleared personal flight for {n} {name} disc(s).") or 0)
+        inv.set_personal_flight(disc, None)
+        print(f"Cleared personal flight for {disc.name}.")
+        return 0
 
     numbers = parse_flight(args.numbers)
     if numbers is None:
@@ -1115,10 +1200,8 @@ def cmd_flight(args, inv):
         numbers["avg_distance"] = args.distance
     if args.confidence is not None:
         numbers["confidence"] = args.confidence
-    n = inv.set_personal_flight(name, numbers)
-    if not n:
-        return _not_found(name)
-    print(f"Recorded personal flight for {n} {name} disc(s). "
+    inv.set_personal_flight(disc, numbers)
+    print(f"Recorded personal flight for {disc.name}. "
           "Recommendations will now use your numbers for this disc.")
     return 0
 
@@ -1248,11 +1331,13 @@ def build_parser():
     p_tag = sub.add_parser("tag", help="add a tag to a disc")
     p_tag.add_argument("disc")
     p_tag.add_argument("tag")
+    p_tag.add_argument("--all", action="store_true", help="apply to every copy of the mold")
     p_tag.set_defaults(func=cmd_tag)
 
     p_untag = sub.add_parser("untag", help="remove a tag from a disc")
     p_untag.add_argument("disc")
     p_untag.add_argument("tag")
+    p_untag.add_argument("--all", action="store_true", help="apply to every copy of the mold")
     p_untag.set_defaults(func=cmd_untag)
 
     p_role = sub.add_parser("role", help="set a personal role for a disc")
@@ -1263,6 +1348,7 @@ def build_parser():
     p_fav = sub.add_parser("favorite", help="mark a disc as a favorite")
     p_fav.add_argument("disc")
     p_fav.add_argument("--unset", action="store_true", help="remove favorite status")
+    p_fav.add_argument("--all", action="store_true", help="apply to every copy of the mold")
     p_fav.set_defaults(func=cmd_favorite)
 
     p_bagcmd = sub.add_parser("bag", help="manage which owned discs are currently carried")

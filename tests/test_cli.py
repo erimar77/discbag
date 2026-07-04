@@ -295,3 +295,60 @@ def test_main_no_args_shows_dashboard_not_argparse_help(tmp_path, monkeypatch, c
     assert rc == 0
     assert "Eric's Disc Bag" in out
     assert "usage: discbag" not in out            # NOT argparse help
+
+
+# ---------- multiple copies of a mold: disambiguation ----------
+
+ROAD = {"name": "Roadrunner", "brand": "Innova", "category": "Fairway Driver",
+        "speed": 7, "glide": 5, "turn": -4, "fade": 1, "stability": "Understable"}
+
+
+def _two_roadrunners(tmp_path):
+    from discbag import inventory
+    inv = inventory.Inventory(path=tmp_path / "inventory.json")
+    inv.add(OwnedDisc.from_db_record(ROAD, plastic="Champion", weight=171))
+    inv.add(OwnedDisc.from_db_record(ROAD, plastic="Star", weight=163))
+    return inv
+
+
+def test_resolve_single_match_never_prompts(tmp_path, monkeypatch):
+    inv = _bag(tmp_path, MAKO3)
+    monkeypatch.setattr(cli.sys.stdin, "isatty", lambda: True)   # even interactive
+    monkeypatch.setattr("builtins.input", lambda *_: (_ for _ in ()).throw(AssertionError("prompted!")))
+    got = cli._resolve(inv, "mako3")
+    assert [d.name for d in got] == ["Mako3"]
+
+
+def test_resolve_ambiguous_noninteractive_errors_and_lists(tmp_path, monkeypatch, capsys):
+    inv = _two_roadrunners(tmp_path)
+    monkeypatch.setattr(cli.sys.stdin, "isatty", lambda: False)
+    assert cli._resolve(inv, "roadrunner") is None
+    res = capsys.readouterr()
+    blob = res.out + res.err
+    assert "Champion" in blob and "Star" in blob     # both copies listed
+    assert "171g" in blob                            # distinguishing detail
+
+
+def test_resolve_interactive_prompt_picks_the_chosen_copy(tmp_path, monkeypatch):
+    inv = _two_roadrunners(tmp_path)
+    monkeypatch.setattr(cli.sys.stdin, "isatty", lambda: True)
+    monkeypatch.setattr("builtins.input", lambda *_: "2")
+    got = cli._resolve(inv, "roadrunner")
+    assert len(got) == 1 and got[0].user.plastic == "Star"
+
+
+def test_favorite_all_flag_targets_every_copy(tmp_path):
+    inv = _two_roadrunners(tmp_path)
+    cli.cmd_favorite(_ns(disc="roadrunner", unset=False, all=True), inv)
+    assert all(d.user.favorite for d in inv.list_discs())
+
+
+def test_remove_archives_only_the_chosen_copy(tmp_path, monkeypatch):
+    inv = _two_roadrunners(tmp_path)
+    monkeypatch.setattr(cli.sys.stdin, "isatty", lambda: True)
+    monkeypatch.setattr("builtins.input", lambda *_: "1")
+    cli.cmd_remove(_ns(name=["roadrunner"], status=None, reason=None), inv)
+    active = inv.list_discs()
+    archived = [d for d in inv.all_discs() if not d.user.is_active]
+    assert [d.user.plastic for d in active] == ["Star"]
+    assert [d.user.plastic for d in archived] == ["Champion"]
