@@ -1056,6 +1056,7 @@ _ANSI = {
     "reset": "\033[0m", "bold": "\033[1m", "dim": "\033[2m",
     "cyan": "\033[36m", "bcyan": "\033[96m", "green": "\033[32m",
     "yellow": "\033[33m", "magenta": "\033[95m", "white": "\033[97m",
+    "purple": "\033[38;5;135m",
 }
 
 
@@ -1085,7 +1086,7 @@ def _relative_day(when, today=None):
 # (emoji, ANSI colour) per section — used only when colour is on.
 _SECTION_STYLE = {
     "Inventory": ("🥏", "cyan"),
-    "Player": ("🎯", "magenta"),
+    "Player": ("🎯", "purple"),
     "Recent Activity": ("📅", "yellow"),
     "Suggestions": ("💡", "green"),
     "Get started": ("👋", "green"),
@@ -1108,7 +1109,7 @@ def render_dashboard(inv, prof, today=None, color=False):
     def header(name):
         if color:
             icon, hue = _SECTION_STYLE.get(name, ("•", "cyan"))
-            lines.append(f"{icon}  {st(name, 'bold', hue)}")
+            lines.append(f"{icon} {st(name, 'bold', hue)}")
         else:
             lines.append(name)
 
@@ -1119,7 +1120,7 @@ def render_dashboard(inv, prof, today=None, color=False):
     width = max(len(title) + 4, 40)
     if color:
         rule = st("━" * width, "cyan", "dim")
-        lines += [rule, st(f"🥏  {title}", "bold", "bcyan"), rule, ""]
+        lines += [rule, st(f"🥏 {title}", "bold", "bcyan"), rule, ""]
     else:
         lines += [title, "─" * max(len(title), 36), ""]
 
