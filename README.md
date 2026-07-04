@@ -54,30 +54,31 @@ Run `discbag` with no arguments and you get a glanceable dashboard, not document
 what your collection looks like, what to practice, and what to do next:
 
 ```text
-Eric's Disc Bag
-────────────────────────────────────
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🥏 Eric's Disc Bag
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Inventory
+🥏 Inventory
   Active discs   14
   In bag          8
   Favorites       5
 
-Player
+🎯 Player
   Max distance   283 ft
   Arm power      Speed ~6.9
   Throw hand     Right
   Putt hand      Left
 
-Recent Activity
+📅 Recent Activity
   Last round     Yesterday
   Last practice  Today
 
-Suggestions
+💡 Suggestions
   Practice       Eagle, Mako3, Leopard
   Missing roles  Overstable mid, Utility driver
   Neglected      Firebird
 
-Quick Commands
+⚡ Quick Commands
   discbag build-bag
   ...
 
@@ -90,6 +91,11 @@ neglected discs) pulled from the same functions the individual commands use. Not
 invented. Set `discbag profile --name <you>` to personalize the title. The complete command
 reference lives behind `discbag --help`, organized by purpose (Common / Organization /
 Analysis / Advanced).
+
+In an interactive terminal the dashboard is colorized — a cyan title rule, and each section
+keyed by an icon and hue (cyan Inventory, purple Player, yellow Recent Activity, green
+Suggestions) — with the numbers and key stats highlighted. When output is piped or redirected,
+or when `NO_COLOR` is set, it degrades to the plain, parseable text above.
 
 ---
 
