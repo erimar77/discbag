@@ -41,10 +41,55 @@ works offline out of the box.
 ```bash
 discbag add mako3                       # look up and add a disc (auto-fills flight numbers)
 discbag add leopard --plastic Star      # attach your own plastic/weight/color/etc.
-discbag profile --typical 250 --max 275 # tell it how you throw
-discbag recommend                       # what does my bag cover, and what's worth adding?
-discbag chart                           # a Braille-dot flight chart of your bag
+discbag profile --name Eric --max 275   # tell it who you are and how you throw
+discbag                                 # your home screen — bag, player, activity, suggestions
+discbag --help                          # the full, grouped command reference
 ```
+
+---
+
+## The home screen
+
+Run `discbag` with no arguments and you get a glanceable dashboard, not documentation —
+what your collection looks like, what to practice, and what to do next:
+
+```text
+Eric's Disc Bag
+────────────────────────────────────
+
+Inventory
+  Active discs   14
+  In bag          8
+  Favorites       5
+
+Player
+  Max distance   283 ft
+  Arm power      Speed ~6.9
+  Throw hand     Right
+  Putt hand      Left
+
+Recent Activity
+  Last round     Yesterday
+  Last practice  Today
+
+Suggestions
+  Practice       Eagle, Mako3, Leopard
+  Missing roles  Overstable mid, Utility driver
+  Neglected      Firebird
+
+Quick Commands
+  discbag build-bag
+  ...
+
+Run 'discbag --help' for the full command reference.
+```
+
+Every line is real engine output — inventory counts, your profile and estimated arm power,
+the latest round/practice, and lightweight suggestions (practice discs, missing roles,
+neglected discs) pulled from the same functions the individual commands use. Nothing is
+invented. Set `discbag profile --name <you>` to personalize the title. The complete command
+reference lives behind `discbag --help`, organized by purpose (Common / Organization /
+Analysis / Advanced).
 
 ---
 
@@ -204,7 +249,7 @@ count as rounds.)
 ### You
 ```bash
 discbag profile                     # show your profile dashboard
-discbag profile [--typical N --max N --experience .. --hand .. --putt-hand ..
+discbag profile [--name Eric --typical N --max N --experience .. --hand .. --putt-hand ..
                  --style .. --fairway-speed N --driver-speed N --spin N
                  --brand Innova --brand "Latitude 64" | --clear-brands]
 ```
@@ -228,7 +273,7 @@ Future:             10+
 
 Estimated Arm Power
 -------------------
-~Speed 6.9
+Speed ~6.9
 
 Recommendations automatically adapt as your distance and throwing ability improve.
 ```

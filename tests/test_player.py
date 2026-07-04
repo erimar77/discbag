@@ -116,3 +116,14 @@ def test_preferred_brands_roundtrip(tmp_path):
 def test_empty_profile_is_empty_with_default_brands():
     # An otherwise-empty profile must still count as empty despite the [] brands default.
     assert PlayerProfile().is_empty() is True
+
+
+def test_profile_has_optional_name():
+    from discbag.player import PlayerProfile
+    p = PlayerProfile(name="Eric")
+    assert p.name == "Eric"
+    # round-trips through dict
+    assert PlayerProfile.from_dict(p.to_dict()).name == "Eric"
+    # a name-only profile is not "empty"; a blank one still is
+    assert not p.is_empty()
+    assert PlayerProfile().is_empty()

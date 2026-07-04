@@ -42,6 +42,10 @@ def humanize_age(last_updated, now_iso=None):
         now = datetime.fromisoformat(now_iso) if now_iso else datetime.now(timezone.utc)
     except ValueError:
         return "unknown"
+    # A --date backfill stores a naive timestamp; "now" is tz-aware. Compare at the
+    # same awareness (day granularity makes the dropped offset immaterial).
+    if (then.tzinfo is None) != (now.tzinfo is None):
+        then, now = then.replace(tzinfo=None), now.replace(tzinfo=None)
     days = (now - then).days
     if days <= 0:
         return "today"
@@ -460,6 +464,20 @@ def cmd_used(args, inv):
     return 0 if recorded else 1
 
 
+def _staleness(disc):
+    """Days since a disc was last used; +inf if never used (sorts as most neglected)."""
+    if not disc.user.use_count:
+        return float("inf")
+    days = _days_ago(disc.user.last_used)
+    return float("inf") if days is None else days
+
+
+def _neglected(discs, threshold=30):
+    """Discs not used within `threshold` days, most neglected first."""
+    return sorted((d for d in discs if _staleness(d) > threshold),
+                  key=_staleness, reverse=True)
+
+
 def cmd_usage(args, inv):
     discs = inv.all_discs()   # usage/history span every disc you've owned
     if args.disc:
@@ -498,18 +516,11 @@ def cmd_usage(args, inv):
     else:
         print("  (none tracked yet — record a round with: discbag used <disc>...)")
 
-    def staleness(d):
-        # Larger = more neglected; None (never used) sorts as most neglected.
-        if not d.user.use_count:
-            return float("inf")
-        days = _days_ago(d.user.last_used)
-        return float("inf") if days is None else days
-
     # "Neglected" is actionable advice — only active discs you could actually throw.
-    neglected = [d for d in inv.list_discs() if staleness(d) > 30]
+    neglected = _neglected(inv.list_discs())
     if neglected:
         print("\nNeglected discs\n")
-        for d in sorted(neglected, key=staleness, reverse=True):
+        for d in neglected:
             note = "never used" if not d.user.use_count else f"last used {_days_ago(d.user.last_used)} days ago"
             print(f"  {d.name:<14} {note}")
     return 0
@@ -845,6 +856,7 @@ def cmd_practice(args, inv):
 def cmd_profile(args, inv):
     prof = player.load_profile()
     fieldmap = [
+        ("name", args.name),
         ("experience", args.experience), ("hand", args.hand),
         ("putt_hand", args.putt_hand), ("style", args.style),
         ("typical_distance", args.typical), ("max_distance", args.max),
@@ -939,12 +951,154 @@ def format_profile(prof):
     if ps is not None:
         lines.append("Estimated Arm Power")
         lines.append("-" * len("Estimated Arm Power"))
-        lines.append(f"~Speed {ps:.1f}")
+        lines.append(f"Speed ~{ps:.1f}")
         lines.append("")
         lines.append("Recommendations automatically adapt as your distance and "
                      "throwing ability improve.")
 
     return "\n".join(lines).rstrip()
+
+
+# ---------- home screen ----------
+
+_ANSI = {
+    "reset": "\033[0m", "bold": "\033[1m", "dim": "\033[2m",
+    "cyan": "\033[36m", "bcyan": "\033[96m", "green": "\033[32m",
+    "yellow": "\033[33m", "magenta": "\033[95m", "white": "\033[97m",
+}
+
+
+def _styler(enabled):
+    """Return a `style(text, *codes)` function; a no-op when styling is disabled,
+    so piped/redirected output and tests stay plain and parseable."""
+    def style(text, *codes):
+        if not enabled or not codes:
+            return text
+        return "".join(_ANSI[c] for c in codes) + text + _ANSI["reset"]
+    return style
+
+
+def _use_color():
+    """Colorize only for an interactive terminal that hasn't opted out via NO_COLOR."""
+    import os
+    return sys.stdout.isatty() and os.environ.get("NO_COLOR") is None
+
+
+def _relative_day(when, today=None):
+    """A timestamp as 'Today' / 'Yesterday' / 'N days ago', or 'never' if unset."""
+    if not when:
+        return "never"
+    return humanize_age(when, now_iso=today).capitalize()
+
+
+# (emoji, ANSI colour) per section — used only when colour is on.
+_SECTION_STYLE = {
+    "Inventory": ("🥏", "cyan"),
+    "Player": ("🎯", "magenta"),
+    "Recent Activity": ("📅", "yellow"),
+    "Suggestions": ("💡", "green"),
+    "Get started": ("👋", "green"),
+    "Quick Commands": ("⚡", "cyan"),
+}
+
+
+def render_dashboard(inv, prof, today=None, color=False):
+    """The application home screen: a concise, glanceable summary of the bag,
+    the player, recent activity, and lightweight suggestions from the engine.
+
+    `color` adds ANSI styling and decorations; when off, the output is plain text.
+    """
+    from discbag import analysis, roles  # local import keeps startup light
+
+    st = _styler(color)
+    active = inv.list_discs()
+    lines = []
+
+    def header(name):
+        if color:
+            icon, hue = _SECTION_STYLE.get(name, ("•", "cyan"))
+            lines.append(f"{icon}  {st(name, 'bold', hue)}")
+        else:
+            lines.append(name)
+
+    def row(label, value, pad=14, value_codes=("white",)):
+        lines.append(f"  {label:<{pad}} {st(str(value), *value_codes)}")
+
+    title = f"{prof.name}'s Disc Bag" if getattr(prof, "name", "") else "Your Disc Bag"
+    width = max(len(title) + 4, 40)
+    if color:
+        rule = st("━" * width, "cyan", "dim")
+        lines += [rule, st(f"🥏  {title}", "bold", "bcyan"), rule, ""]
+    else:
+        lines += [title, "─" * max(len(title), 36), ""]
+
+    header("Inventory")
+    row("Active discs", len(active), value_codes=("bold", "bcyan"))
+    row("In bag", len(inv.filter(in_bag=True)))
+    row("Favorites", len(inv.filter(favorite=True)))
+    lines.append("")
+
+    header("Player")
+    if prof.is_empty():
+        lines.append("  " + st("No profile yet", "dim")
+                     + " — set one with: discbag profile --max 300 --hand right")
+    else:
+        if prof.max_distance:
+            row("Max distance", f"{prof.max_distance} ft")
+        ps = player.power_speed(prof)
+        if ps is not None:
+            row("Arm power", f"Speed ~{ps:.1f}", value_codes=("bold", "bcyan"))
+        if prof.hand:
+            row("Throw hand", _cap(prof.hand))
+        putt = _cap(prof.putt_hand) or (f"{_cap(prof.hand)} (same as throwing)" if prof.hand else "")
+        if putt:
+            row("Putt hand", putt)
+    lines.append("")
+
+    # Recent activity — the latest round/practice across every disc ever owned.
+    everything = inv.all_discs()
+    last_round = max((d.user.last_round for d in everything if d.user.last_round), default=None)
+    last_practice = max((d.user.last_practice for d in everything if d.user.last_practice),
+                        default=None)
+    if last_round or last_practice:
+        header("Recent Activity")
+        row("Last round", _relative_day(last_round, today))
+        row("Last practice", _relative_day(last_practice, today))
+        lines.append("")
+
+    profile = None if prof.is_empty() else prof
+    if active:
+        prac = analysis.practice(active, count=3, profile=profile)
+        gaps = [c.role.name for c in roles.assess(active, profile=profile) if not c.covered]
+        neglected = _neglected(active)
+        rows = []
+        if prac:
+            rows.append(("Practice", ", ".join(d.name for d in prac), "green"))
+        if gaps:
+            rows.append(("Missing roles", ", ".join(gaps[:3]), "yellow"))
+        if neglected:
+            rows.append(("Neglected", ", ".join(d.name for d in neglected[:3]), "dim"))
+        if rows:
+            header("Suggestions")
+            for label, value, hue in rows:
+                row(label, value, value_codes=(hue,))
+            lines.append("")
+    else:
+        header("Get started")
+        lines.append("  Your bag is empty — add a disc with: discbag add <name>")
+        lines.append("")
+
+    header("Quick Commands")
+    for cmd in ("discbag build-bag", "discbag choose --distance 300",
+                "discbag practice", "discbag usage", "discbag list"):
+        lines.append("  " + st(cmd, "dim"))
+    lines += ["", st("Run 'discbag --help' for the full command reference.", "dim")]
+    return "\n".join(lines)
+
+
+def cmd_dashboard(args, inv):
+    print(render_dashboard(inv, player.load_profile(), color=_use_color()))
+    return 0
 
 
 def cmd_flight(args, inv):
@@ -971,11 +1125,77 @@ def cmd_flight(args, inv):
 
 # ---------- argument parsing ----------
 
+_HELP_GROUPS = [
+    ("Common Commands", [
+        ("add", "add a disc to your bag"),
+        ("list", "list the discs in your bag"),
+        ("show", "full details for a disc"),
+        ("build-bag", "recommend a bag by role"),
+        ("recommend", "role coverage + what to buy next"),
+        ("profile", "show or set your player profile"),
+    ]),
+    ("Organization", [
+        ("bag", "manage which discs you currently carry"),
+        ("remove", "archive a disc (keeps its history)"),
+        ("restore", "return an archived disc to the bag"),
+        ("delete", "permanently erase a disc"),
+        ("history", "a disc's full story, even once gone"),
+        ("favorite", "mark a disc as a favorite"),
+        ("tag / untag", "add or remove a tag"),
+        ("role", "set a personal role label"),
+    ]),
+    ("Analysis", [
+        ("round-used / used", "record a round"),
+        ("practice-used", "record a practice session"),
+        ("usage", "use stats (per disc or overall)"),
+        ("practice", "form-focused practice discs"),
+        ("choose", "which disc to throw for a shot"),
+        ("overlap", "find near-duplicate discs"),
+        ("compare", "side-by-side flight/role table"),
+        ("chart", "terminal flight visualizations"),
+        ("flight", "record how a disc flies for you"),
+    ]),
+    ("Advanced", [
+        ("explain", "why the engine chose what it did"),
+        ("score", "component breakdown of a disc's score"),
+        ("sync", "refresh cached manufacturer data"),
+        ("updatedb", "refresh the disc database"),
+        ("db-info", "database size and age"),
+    ]),
+]
+
+
+class _GroupedHelpFormatter(argparse.RawDescriptionHelpFormatter):
+    """Keeps the epilog's literal formatting and suppresses argparse's default flat
+    list of subcommands — the epilog documents them, grouped by purpose, instead."""
+
+    def _format_action(self, action):
+        if isinstance(action, argparse._SubParsersAction):
+            return ""
+        return super()._format_action(action)
+
+
+def _help_epilog():
+    width = max(len(name) for _, cmds in _HELP_GROUPS for name, _ in cmds) + 2
+    lines = ["commands:"]
+    for title, cmds in _HELP_GROUPS:
+        lines.append("")
+        lines.append(f"  {title}")
+        for name, desc in cmds:
+            lines.append(f"    {name:<{width}} {desc}")
+    lines.append("")
+    lines.append("Run 'discbag <command> --help' for details on any command.")
+    return "\n".join(lines)
+
+
 def build_parser():
-    parser = argparse.ArgumentParser(prog="discbag", description="Manage your disc golf bag.")
+    parser = argparse.ArgumentParser(
+        prog="discbag", description="A disc golf bag intelligence engine.",
+        epilog=_help_epilog(), formatter_class=_GroupedHelpFormatter)
     parser.add_argument("--updatedb", action="store_true",
                         help="refresh the disc database from the online source, then exit")
-    sub = parser.add_subparsers(dest="command")
+    # metavar hides argparse's alphabetical brace-dump; the grouped epilog documents commands.
+    sub = parser.add_subparsers(dest="command", metavar="<command>")
 
     p_add = sub.add_parser("add", help="add a disc to your bag (looks up stats)")
     p_add.add_argument("query", nargs="+", help="disc name, e.g. 'Gateway Wizard SS Chalky'")
@@ -1147,6 +1367,7 @@ def build_parser():
     p_prac.set_defaults(func=cmd_practice)
 
     p_prof = sub.add_parser("profile", help="show or set your player profile")
+    p_prof.add_argument("--name", help="your name, shown on the dashboard home screen")
     p_prof.add_argument("--experience", choices=["beginner", "intermediate", "advanced", "elite"])
     p_prof.add_argument("--hand", choices=["right", "left"], help="dominant throwing hand")
     p_prof.add_argument("--putt-hand", "--putt", dest="putt_hand", choices=["right", "left"],
@@ -1183,8 +1404,8 @@ def main(argv=None):
     if args.updatedb:
         return cmd_updatedb(args, inv)
     if not getattr(args, "command", None):
-        parser.print_help()
-        return 0
+        # The bare command is the application home screen, not the reference manual.
+        return cmd_dashboard(args, inv)
     return args.func(args, inv)
 
 

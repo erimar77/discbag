@@ -7,6 +7,14 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- A home-screen dashboard. Running `discbag` with no arguments now prints a glanceable
+  summary — inventory counts, your profile and estimated arm power, latest round/practice,
+  and lightweight suggestions (practice discs, missing roles, neglected discs) — instead of
+  argparse help. Every value comes from existing engine functions; nothing is invented. In
+  an interactive terminal it's colorized with section icons (plain and parseable when piped
+  or when `NO_COLOR` is set). `discbag --help` becomes the canonical reference and is now
+  organized by purpose (Common / Organization / Analysis / Advanced). `discbag profile
+  --name <you>` personalizes the dashboard title.
 - Disc lifecycle that preserves history. Every disc has a **status** — `active` or an
   archived state (`retired`, `lost`, `sold`, `gifted`, `broken`) with an optional reason.
   `remove` now **archives** instead of deleting (default status `retired`; `--status` and

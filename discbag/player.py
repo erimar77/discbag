@@ -40,6 +40,7 @@ POWER_OVERRIDES = {}
 @dataclass
 class PlayerProfile:
     # General
+    name: str = ""            # the player's name, shown on the dashboard home screen
     experience: str = ""      # beginner / intermediate / advanced / elite
     hand: str = ""            # dominant throwing hand: right / left
     putt_hand: str = ""       # putting hand, if different from the throwing hand
