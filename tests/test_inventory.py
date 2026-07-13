@@ -431,3 +431,80 @@ def test_migration_writes_backup(tmp_path):
     backup = path.with_suffix(".json.bak")
     assert backup.exists()
     assert json.loads(backup.read_text()) == old
+
+
+# ---------- update_metadata: metadata correction, no career event ----------
+
+ROADRUNNER = {"name": "Roadrunner", "brand": "Innova", "category": "Fairway",
+              "speed": 9, "glide": 5, "turn": -4, "fade": 1,
+              "stability": "Understable"}
+
+
+def test_update_metadata_sets_fields_without_logging_event(tmp_path):
+    inv = make_inv(tmp_path)
+    inv.add(OwnedDisc.from_db_record(MAKO3))
+    disc = inv.all_discs()[0]
+    before = len(disc.user.events or [])
+    inv.update_metadata(disc, plastic="Champion", weight=171, color="Orange",
+                        condition="New", notes="clear champ")
+    u = inv.all_discs()[0].user
+    assert u.plastic == "Champion" and u.weight == 171
+    assert u.color == "Orange" and u.condition == "New" and u.notes == "clear champ"
+    # The core guarantee: metadata edits are not career/history events.
+    assert len(u.events or []) == before
+
+
+def test_update_metadata_preserves_history_and_flags(tmp_path):
+    inv = make_inv(tmp_path)
+    inv.add(OwnedDisc.from_db_record(MAKO3))
+    inv.record_use("mako3", "2026-07-03T00:00:00+00:00")
+    inv.set_favorite("mako3", True)
+    inv.add_tag("mako3", "workhorse")
+    disc = inv.all_discs()[0]
+    inv.update_metadata(disc, color="Blue")
+    u = inv.all_discs()[0].user
+    assert u.color == "Blue"
+    assert u.use_count == 1
+    assert u.favorite is True
+    assert "workhorse" in u.tags
+
+
+def test_update_metadata_none_leaves_fields_unchanged(tmp_path):
+    inv = make_inv(tmp_path)
+    inv.add(OwnedDisc.from_db_record(MAKO3, plastic="Star", color="orange"))
+    disc = inv.all_discs()[0]
+    inv.update_metadata(disc, weight=175)          # only weight provided
+    u = inv.all_discs()[0].user
+    assert u.weight == 175
+    assert u.plastic == "Star"                     # untouched
+    assert u.color == "orange"                     # untouched
+
+
+def test_update_metadata_identity_change_refreshes_cached(tmp_path):
+    inv = make_inv(tmp_path)
+    # Added under a typo'd mold with placeholder flight numbers.
+    typo = {"name": "Roadruner", "brand": "Innova", "category": "Fairway",
+            "speed": 0, "glide": 0, "turn": 0, "fade": 0, "stability": ""}
+    inv.add(OwnedDisc.from_db_record(typo))
+    disc = inv.all_discs()[0]
+    identity_changed, matched = inv.update_metadata(
+        disc, mold="Roadrunner", db_discs=[ROADRUNNER])
+    assert identity_changed is True
+    assert matched is not None
+    d = inv.all_discs()[0]
+    assert d.mold == "Roadrunner"
+    assert (d.speed, d.glide, d.turn, d.fade) == (9, 5, -4, 1)
+
+
+def test_update_metadata_identity_change_no_match_keeps_cached(tmp_path):
+    inv = make_inv(tmp_path)
+    inv.add(OwnedDisc.from_db_record(MAKO3))
+    disc = inv.all_discs()[0]
+    before = (disc.speed, disc.glide, disc.turn, disc.fade)
+    identity_changed, matched = inv.update_metadata(
+        disc, mold="Nonexistent Mold", db_discs=[])
+    assert identity_changed is True
+    assert matched is None
+    d = inv.all_discs()[0]
+    assert d.mold == "Nonexistent Mold"            # string still applied
+    assert (d.speed, d.glide, d.turn, d.fade) == before   # cached untouched

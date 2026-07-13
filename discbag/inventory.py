@@ -556,6 +556,55 @@ class Inventory:
         self.set_status(disc, status, reason=reason, when=when)
         return self.add(new)
 
+    def update_metadata(self, disc, *, brand=None, mold=None, plastic=None,
+                        weight=None, color=None, condition=None, notes=None,
+                        db_discs=None):
+        """Correct one physical disc's inventory metadata in place (the `edit`
+        command). Overwrites only the fields passed — ``None`` means leave
+        unchanged. Never logs a history event: metadata correction is not part
+        of a disc's career, so history, usage, favorite, tags, lifecycle status,
+        and the event log are all left intact.
+
+        ``brand`` (manufacturer) and ``mold`` are the disc's identity; the cached
+        flight snapshot is derived from them. If either changes, the cached
+        snapshot is refreshed here via the same resolver ``add`` uses
+        (``db.find_disc``) so callers never have to remember to. Returns
+        ``(identity_changed, matched_record_or_None)`` so the CLI can report the
+        lookup outcome. On no DB match the identity strings are still applied and
+        the cached snapshot is left untouched.
+        """
+        from discbag import db
+
+        identity_changed = False
+        if brand is not None and brand != disc.brand:
+            disc.brand = brand
+            identity_changed = True
+        if mold is not None and mold != disc.mold:
+            disc.mold = mold
+            identity_changed = True
+
+        u = disc.user
+        if plastic is not None:
+            u.plastic = plastic
+        if weight is not None:
+            u.weight = weight
+        if color is not None:
+            u.color = color
+        if condition is not None:
+            u.condition = condition
+        if notes is not None:
+            u.notes = notes
+
+        matched = None
+        if identity_changed and db_discs is not None:
+            best, _ = db.find_disc(f"{disc.brand} {disc.mold}", db_discs)
+            if best is not None:
+                disc.cached = Disc.from_db_record(best)
+                matched = best
+
+        self._save()
+        return identity_changed, matched
+
     def record_use(self, name, when, session_type="round"):
         """Record that a disc was used at timestamp `when` in a session of the given
         type ("round" or "practice"): bump the count, set last_used, and append a
