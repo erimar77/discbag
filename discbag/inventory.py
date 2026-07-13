@@ -28,6 +28,36 @@ RUNTIME_INVENTORY_PATH = RUNTIME_DIR / "inventory.json"
 _MOLD_FIELDS = ("name", "brand", "category", "speed", "glide", "turn", "fade", "stability")
 
 
+# --- event log ---
+# Each event is a plain dict with a "date" (YYYY-MM-DD) and a "type"; the timeline
+# renderer maps type -> label. Persistence stays plain dicts; these builders are the
+# single source of their shape. Inventory methods are the sole recorders of events.
+
+def _date_only(when):
+    """The YYYY-MM-DD date portion of a timestamp, or None."""
+    return str(when)[:10] if when else None
+
+
+def _added_event(when):
+    return {"date": _date_only(when), "type": "added"}
+
+
+def _use_event(when, session_type):
+    return {"date": _date_only(when), "type": "use", "session_type": session_type}
+
+
+def _status_event(when, status, reason=None):
+    return {"date": _date_only(when), "type": "status", "status": status, "reason": reason}
+
+
+def _damaged_event(when, reason=None):
+    return {"date": _date_only(when), "type": "damaged", "reason": reason}
+
+
+def _damaged_retired_event(when, reason=None):
+    return {"date": _date_only(when), "type": "damaged_retired", "reason": reason}
+
+
 def _normalize_use(entry):
     """A use-log entry as {"date", "session_type"}. A bare timestamp string is a
     legacy round; a dict may omit the type (defaults to round)."""
@@ -93,6 +123,10 @@ class UserData:
     # still "active" and carried. Discs are plastic — replaced, never repaired — so
     # this is only cleared to correct a mistake, never to model a repair.
     damaged: bool = False
+    # Chronological event log — the source of truth for the history timeline. None on a
+    # legacy disc that predates the log (the loader seeds it from known timestamps); a
+    # list once seeded or created. Never None on a disc created through ``add``.
+    events: Optional[List] = None
 
     @classmethod
     def from_dict(cls, data):
@@ -143,6 +177,11 @@ class UserData:
     @property
     def is_active(self):
         return (self.status or "active") == "active"
+
+    def log_event(self, event):
+        """Append an event, initializing the log if this is the disc's first. Storage
+        primitive — Inventory decides *what* to record; this just stores it."""
+        self.events = list(self.events or []) + [event]
 
 
 @dataclass
@@ -268,12 +307,16 @@ class Inventory:
                      for d in raw]
             self._discs = discs
             self._backfill_ids()
+            self._seed_events()
             self._save()
             return discs
         discs = [OwnedDisc.from_dict(d) for d in raw]
         self._discs = discs
-        # Backfill ids onto any pre-identity discs; persist only if something changed.
-        if self._backfill_ids():
+        # Backfill ids and seed event logs onto pre-feature discs; persist if anything changed.
+        changed = self._backfill_ids()
+        if self._seed_events():
+            changed = True
+        if changed:
             self._save()
         return discs
 
@@ -286,6 +329,30 @@ class Inventory:
                 assigned = True
         return assigned
 
+    def _seed_events(self):
+        """One-time backfill of the event log for legacy discs (events is None), from
+        known timestamps only — never inventing an event that was not stored. Returns
+        True if any disc was seeded. Idempotent: a disc with a list is left alone."""
+        seeded = False
+        for d in self._discs:
+            u = d.user
+            if u.events is not None:
+                continue
+            evts = []
+            if u.date_added:
+                evts.append(_added_event(u.date_added))
+            for e in u.uses:                 # normalized {date, session_type}
+                if e["date"]:
+                    evts.append(_use_event(e["date"], e["session_type"]))
+            # The last known transition into the current status (not full history).
+            if not u.is_active and u.status_date:
+                evts.append(_status_event(u.status_date, u.status, u.status_reason))
+            # Damage is deliberately NOT seeded: status_date may not mark when the
+            # damage happened, and inventing that timestamp is forbidden.
+            u.events = evts
+            seeded = True
+        return seeded
+
     def _save(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.path.with_suffix(self.path.suffix + ".tmp")
@@ -295,6 +362,9 @@ class Inventory:
     def add(self, disc):
         if not disc.id:
             disc.id = _new_id()
+        if disc.user.events is None:
+            disc.user.events = []            # a created disc is never left unseeded
+        disc.user.log_event(_added_event(disc.user.date_added))
         self._discs.append(disc)
         self._save()
         return disc
@@ -429,6 +499,7 @@ class Inventory:
             u.status_date = when
             if status != "active":
                 u.in_bag = False
+            u.log_event(_status_event(when, status, reason))
         return self._mutate(name, apply)
 
     def set_damaged(self, name, value, reason=None, when=None):
@@ -438,11 +509,28 @@ class Inventory:
         Returns discs updated."""
         def apply(u):
             u.damaged = bool(value)
-            if value and reason is not None:
-                u.status_reason = reason
-            if value and when is not None:
-                u.status_date = when
+            if value:
+                if reason is not None:
+                    u.status_reason = reason
+                if when is not None:
+                    u.status_date = when
+                u.log_event(_damaged_event(when, reason))
+            # Clearing the flag (mistake fix) is not itself a story event.
         return self._mutate(name, apply)
+
+    def retire_damaged(self, disc, reason=None, when=None):
+        """Atomically retire a disc as damaged (the `damaged --retire` command): set
+        damaged, archive as broken, pull it from the bag, and log ONE combined
+        `damaged_retired` event. Does not route through set_status/set_damaged, so the
+        single atomic command yields a single event, not two. Returns discs updated."""
+        def apply(u):
+            u.damaged = True
+            u.status = "broken"
+            u.status_reason = reason
+            u.status_date = when
+            u.in_bag = False
+            u.log_event(_damaged_retired_event(when, reason))
+        return self._mutate(disc, apply)
 
     def replace(self, disc, status="retired", reason=None, when=None, **overrides):
         """Replace one physical disc: archive `disc` (an OwnedDisc) with `status`,
@@ -461,6 +549,7 @@ class Inventory:
             favorite=u.favorite,
             in_bag=u.in_bag,
             tags=list(u.tags),
+            date_added=_date_only(when),     # a fresh copy is added now — dates its Added event
         )
         new = OwnedDisc(brand=disc.brand, mold=disc.mold,
                         cached=Disc.from_dict(disc.cached.to_dict()), user=new_user)
@@ -478,4 +567,5 @@ class Inventory:
             # last_used tracks the most recent date, even if uses are backfilled.
             if not u.last_used or str(when)[:10] >= str(u.last_used)[:10]:
                 u.last_used = when
+            u.log_event(_use_event(when, session_type))
         return self._mutate(name, apply)

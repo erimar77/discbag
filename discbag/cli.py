@@ -415,11 +415,11 @@ def cmd_damaged(args, inv):
         inv.set_damaged(disc, False)
         print(f"Cleared the damaged flag on {disc.brand} {disc.name}.")
         return 0
-    inv.set_damaged(disc, True, reason=reason, when=_now_iso())
     if retire:
-        inv.set_status(disc, "broken", reason=reason, when=_now_iso())
+        inv.retire_damaged(disc, reason=reason, when=_now_iso())
         print(f"Retired {disc.brand} {disc.name} as damaged (Broken).")
     else:
+        inv.set_damaged(disc, True, reason=reason, when=_now_iso())
         print(f"Marked {disc.brand} {disc.name} as damaged — still in your bag.")
     if reason:
         print(f"  Reason: {reason}")

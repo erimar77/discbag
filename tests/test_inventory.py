@@ -168,6 +168,87 @@ def test_delete_hard_removes_by_mold_name(tmp_path):
     assert inv.all_discs() == []
 
 
+# ---------- event log ----------
+
+def _types(user):
+    return [e["type"] for e in (user.events or [])]
+
+
+def test_new_disc_starts_with_an_added_event(tmp_path):
+    inv = make_inv(tmp_path)
+    d = inv.add(OwnedDisc.from_db_record(MAKO3, date_added="2026-07-12"))
+    assert d.user.events is not None                      # never None once created
+    added = [e for e in d.user.events if e["type"] == "added"]
+    assert len(added) == 1 and added[0]["date"] == "2026-07-12"
+
+
+def test_record_use_appends_a_typed_use_event(tmp_path):
+    inv = make_inv(tmp_path)
+    inv.add(OwnedDisc.from_db_record(MAKO3, date_added="2026-07-12"))
+    inv.record_use("mako3", "2026-07-13T00:00:00+00:00", session_type="practice")
+    ev = [e for e in inv.list_discs()[0].user.events if e["type"] == "use"]
+    assert ev == [{"date": "2026-07-13", "type": "use", "session_type": "practice"}]
+
+
+def test_set_status_appends_status_event_including_restore(tmp_path):
+    inv = make_inv(tmp_path)
+    inv.add(OwnedDisc.from_db_record(MAKO3, date_added="2026-07-12"))
+    inv.set_status("mako3", "lost", reason="hole 7", when="2026-09-18T00:00:00+00:00")
+    inv.set_status("mako3", "active", when="2026-09-20T00:00:00+00:00")
+    status_events = [e for e in inv.all_discs()[0].user.events if e["type"] == "status"]
+    assert [(e["status"], e["date"]) for e in status_events] == [
+        ("lost", "2026-09-18"), ("active", "2026-09-20")]
+    assert status_events[0]["reason"] == "hole 7"
+
+
+def test_set_damaged_true_logs_event_false_does_not(tmp_path):
+    inv = make_inv(tmp_path)
+    inv.add(OwnedDisc.from_db_record(MAKO3, date_added="2026-07-12"))
+    inv.set_damaged("mako3", True, reason="cracked", when="2026-08-12T00:00:00+00:00")
+    inv.set_damaged("mako3", False)
+    dmg = [e for e in inv.list_discs()[0].user.events if e["type"] == "damaged"]
+    assert dmg == [{"date": "2026-08-12", "type": "damaged", "reason": "cracked"}]
+
+
+def test_retire_damaged_is_atomic_with_one_combined_event(tmp_path):
+    inv = make_inv(tmp_path)
+    inv.add(OwnedDisc.from_db_record(MAKO3, date_added="2026-07-12"))
+    assert inv.retire_damaged("mako3", reason="chewed", when="2026-08-12T00:00:00+00:00") == 1
+    u = inv.all_discs()[0].user
+    assert u.damaged is True and u.status == "broken" and u.in_bag is False
+    combined = [e for e in u.events if e["type"] in ("damaged", "status", "damaged_retired")]
+    assert combined == [{"date": "2026-08-12", "type": "damaged_retired", "reason": "chewed"}]
+
+
+def test_seeding_backfills_from_known_timestamps(tmp_path):
+    path = tmp_path / "inventory.json"
+    rec = OwnedDisc.from_db_record(MAKO3, date_added="2026-07-12").to_dict()
+    rec["user"].pop("events", None)                       # legacy: no event log
+    rec["user"]["use_dates"] = [{"date": "2026-07-13T00:00:00+00:00", "session_type": "round"}]
+    rec["user"]["status"] = "lost"
+    rec["user"]["status_reason"] = "hole 7"
+    rec["user"]["status_date"] = "2026-09-18T00:00:00+00:00"
+    rec["user"]["damaged"] = True                         # a legacy damaged disc...
+    path.write_text(json.dumps([rec]))
+
+    u = inventory.Inventory(path=path).all_discs()[0].user
+    kinds = _types(u)
+    assert kinds.count("added") == 1
+    assert kinds.count("use") == 1
+    assert kinds.count("status") == 1
+    assert "damaged" not in kinds                         # ...gets NO invented damage event
+
+
+def test_seeding_is_idempotent_across_reloads(tmp_path):
+    path = tmp_path / "inventory.json"
+    rec = OwnedDisc.from_db_record(MAKO3, date_added="2026-07-12").to_dict()
+    rec["user"].pop("events", None)
+    path.write_text(json.dumps([rec]))
+    first = _types(inventory.Inventory(path=path).all_discs()[0].user)
+    second = _types(inventory.Inventory(path=path).all_discs()[0].user)
+    assert first == second == ["added"]                   # not duplicated on reload
+
+
 # ---------- disc lifecycle (status) ----------
 
 def test_new_disc_is_active(tmp_path):
