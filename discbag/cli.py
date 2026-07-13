@@ -60,12 +60,14 @@ def _print_disc_row(disc):
     plastic = f" [{disc.plastic}]" if disc.plastic else ""
     u = getattr(disc, "user", None)
     star = " ★" if u and u.favorite else ""
+    notes = []
     if u and not u.is_active:
-        out = f" ({u.status})"                       # archived: show the lifecycle status
+        notes.append(u.status)                       # archived: show the lifecycle status
     elif u and not u.in_bag:
-        out = " (out of bag)"
-    else:
-        out = ""
+        notes.append("out of bag")
+    if u and u.damaged:
+        notes.append("damaged")                      # worn but (if active) still carried
+    out = f" ({', '.join(notes)})" if notes else ""
     print(f"  {disc.brand} {disc.name}{plastic}{star}{out}".rstrip())
     role = f"  ·  {u.role}" if u and u.role else ""
     tags = f"  #{' #'.join(u.tags)}" if u and u.tags else ""
@@ -95,6 +97,7 @@ def format_owned(disc, profile=None):
         ("Weight", f"{u.weight}g" if u.weight else ""),
         ("Color", u.color),
         ("Condition", u.condition),
+        ("Damaged", "yes" if u.damaged else ""),
         ("Bought at", u.purchase_location),
         ("Added", u.date_added),
         ("Use count", u.use_count or ""),
@@ -274,6 +277,8 @@ def _disc_descriptor(disc):
         bits.append(f"added {str(u.date_added)[:10]}")
     if not u.is_active:
         bits.append(u.status)
+    if u.damaged:
+        bits.append("damaged")
     if u.notes:
         bits.append(u.notes)
     return ", ".join(bits) if bits else "no distinguishing details"
@@ -372,6 +377,73 @@ def cmd_restore(args, inv):
     disc = targets[0]
     inv.set_status(disc, "active", reason=None, when=_now_iso())
     print(f"Restored {disc.brand} {disc.name} to Active.")
+    return 0
+
+
+def cmd_lost(args, inv):
+    """Mark a disc lost: archive it with status=lost. It leaves the active bag but
+    keeps its history; `restore` brings it back if you find it."""
+    name = " ".join(args.name).strip()
+    targets = _resolve(inv, name)
+    if targets is None:
+        return 1
+    disc = targets[0]
+    reason = getattr(args, "reason", None)
+    inv.set_status(disc, "lost", reason=reason, when=_now_iso())
+    print(f"Marked {disc.brand} {disc.name} as Lost.")
+    if reason:
+        print(f"  Reason: {reason}")
+    return 0
+
+
+def cmd_damaged(args, inv):
+    """Flag a disc as damaged. By default it stays active and carried, just flagged;
+    `--retire` archives it (worn beyond use) as broken; `--unset` clears the flag to
+    correct a mistake. Discs are replaced, never repaired — see `replace`."""
+    retire = getattr(args, "retire", False)
+    unset = getattr(args, "unset", False)
+    if retire and unset:
+        print("Choose one of --retire or --unset, not both.", file=sys.stderr)
+        return 1
+    name = " ".join(args.name).strip()
+    targets = _resolve(inv, name)
+    if targets is None:
+        return 1
+    disc = targets[0]
+    reason = getattr(args, "reason", None)
+    if unset:
+        inv.set_damaged(disc, False)
+        print(f"Cleared the damaged flag on {disc.brand} {disc.name}.")
+        return 0
+    inv.set_damaged(disc, True, reason=reason, when=_now_iso())
+    if retire:
+        inv.set_status(disc, "broken", reason=reason, when=_now_iso())
+        print(f"Retired {disc.brand} {disc.name} as damaged (Broken).")
+    else:
+        print(f"Marked {disc.brand} {disc.name} as damaged — still in your bag.")
+    if reason:
+        print(f"  Reason: {reason}")
+    return 0
+
+
+def cmd_replace(args, inv):
+    """Replace a disc: archive the old copy (keeping its history) and add a fresh copy
+    of the same mold with a clean history. The new copy inherits plastic/weight/color/
+    role/favorite/tags; --plastic/--weight/--color override for a different run."""
+    name = " ".join(args.name).strip()
+    targets = _resolve(inv, name)
+    if targets is None:
+        return 1
+    disc = targets[0]
+    status = getattr(args, "status", None) or "retired"
+    reason = getattr(args, "reason", None)
+    overrides = {k: getattr(args, k, None) for k in ("plastic", "weight", "color")
+                 if getattr(args, k, None) is not None}
+    new = inv.replace(disc, status=status, reason=reason, when=_now_iso(), **overrides)
+    print(f"Replaced {disc.brand} {disc.name}.")
+    print(f"  Old copy archived ({status.capitalize()}), history kept.")
+    plastic = f" [{new.user.plastic}]" if new.user.plastic else ""
+    print(f"  New copy added{plastic} — fresh history.")
     return 0
 
 
@@ -1231,6 +1303,9 @@ _HELP_GROUPS = [
     ("Organization", [
         ("bag", "manage which discs you currently carry"),
         ("remove", "archive a disc (keeps its history)"),
+        ("lost", "mark a disc lost"),
+        ("damaged", "flag a disc damaged (--retire to archive)"),
+        ("replace", "archive a disc, add a fresh copy"),
         ("restore", "return an archived disc to the bag"),
         ("delete", "permanently erase a disc"),
         ("history", "a disc's full story, even once gone"),
@@ -1319,6 +1394,33 @@ def build_parser():
     p_restore = sub.add_parser("restore", help="return an archived disc to the active bag")
     p_restore.add_argument("name", nargs="+")
     p_restore.set_defaults(func=cmd_restore)
+
+    p_lost = sub.add_parser("lost", help="mark a disc lost (archives it, keeps its history)")
+    p_lost.add_argument("name", nargs="+")
+    p_lost.add_argument("--reason", help="a note, e.g. \"hole 7 water\"")
+    p_lost.set_defaults(func=cmd_lost)
+
+    p_dmg = sub.add_parser("damaged",
+                           help="flag a disc as damaged (still carried; --retire to archive)")
+    p_dmg.add_argument("name", nargs="+")
+    p_dmg.add_argument("--reason", help="a note, e.g. \"cracked rim\"")
+    grp = p_dmg.add_mutually_exclusive_group()
+    grp.add_argument("--retire", action="store_true",
+                     help="worn beyond use: archive it as broken")
+    grp.add_argument("--unset", action="store_true",
+                     help="clear the damaged flag (mistake fix; discs aren't repaired)")
+    p_dmg.set_defaults(func=cmd_damaged)
+
+    p_repl = sub.add_parser("replace",
+                            help="archive a disc and add a fresh copy with a clean history")
+    p_repl.add_argument("name", nargs="+")
+    p_repl.add_argument("--status", choices=_ARCHIVE_STATUSES,
+                        help="how the old copy left the bag (default: retired)")
+    p_repl.add_argument("--reason", help="a note about the old copy")
+    p_repl.add_argument("--plastic", help="override the new copy's plastic")
+    p_repl.add_argument("--weight", type=int, help="override the new copy's weight (grams)")
+    p_repl.add_argument("--color", help="override the new copy's color")
+    p_repl.set_defaults(func=cmd_replace)
 
     p_hist = sub.add_parser("history", help="a disc's full story, even after it leaves the bag")
     p_hist.add_argument("name", nargs="+")

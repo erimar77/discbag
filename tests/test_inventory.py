@@ -220,6 +220,95 @@ def test_filter_by_status(tmp_path):
     assert {d.name for d in inv.filter(include_archived=True)} == {"Mako3", "Leopard"}
 
 
+# ---------- damaged flag (orthogonal to status) ----------
+
+def test_new_disc_is_not_damaged(tmp_path):
+    inv = make_inv(tmp_path)
+    inv.add(OwnedDisc.from_db_record(MAKO3))
+    assert inv.list_discs()[0].user.damaged is False
+
+
+def test_set_damaged_flags_without_archiving(tmp_path):
+    inv = make_inv(tmp_path)
+    inv.add(OwnedDisc.from_db_record(MAKO3))
+    assert inv.set_damaged("mako3", True, reason="cracked rim") == 1
+    d = inv.list_discs()[0]                 # still active — not removed from the bag
+    assert d.user.damaged is True
+    assert d.user.status == "active"
+    assert d.user.status_reason == "cracked rim"
+
+
+def test_set_damaged_can_be_cleared(tmp_path):
+    inv = make_inv(tmp_path)
+    inv.add(OwnedDisc.from_db_record(MAKO3))
+    inv.set_damaged("mako3", True)
+    assert inv.set_damaged("mako3", False) == 1
+    assert inv.list_discs()[0].user.damaged is False
+
+
+def test_damaged_survives_reload_and_old_files_default_false(tmp_path):
+    path = tmp_path / "inventory.json"
+    inv = inventory.Inventory(path=path)
+    inv.add(OwnedDisc.from_db_record(MAKO3))
+    inv.set_damaged("mako3", True)
+    assert inventory.Inventory(path=path).list_discs()[0].user.damaged is True
+    # a record predating the field loads as not-damaged
+    rec = OwnedDisc.from_db_record(dict(MAKO3, name="Leopard")).to_dict()
+    rec["user"].pop("damaged", None)
+    path.write_text(json.dumps([rec]))
+    assert inventory.Inventory(path=path).list_discs()[0].user.damaged is False
+
+
+# ---------- replace: archive the old copy, add a fresh one ----------
+
+def test_replace_archives_old_and_adds_fresh_copy(tmp_path):
+    inv = make_inv(tmp_path)
+    old = inv.add(OwnedDisc.from_db_record(
+        MAKO3, plastic="Star", weight=175, color="orange"))
+    old.user.role = "Straight Midrange"
+    old.user.favorite = True
+    old.user.tags = ["workhorse"]
+    inv.record_use("mako3", "2026-05-01T00:00:00+00:00")
+    inv.set_damaged("mako3", True)
+
+    new = inv.replace(old, status="broken", reason="worn out")
+
+    # old copy archived, history intact
+    assert old.user.status == "broken"
+    assert old.user.status_reason == "worn out"
+    assert old.user.in_bag is False
+    assert old.user.use_count == 1
+
+    # new copy: distinct identity, fresh history, carried-over bag identity
+    assert new.id and new.id != old.id
+    assert new.user.status == "active"
+    assert new.user.use_count == 0 and new.user.use_dates == []
+    assert new.user.damaged is False
+    assert new.user.plastic == "Star" and new.user.weight == 175
+    assert new.user.color == "orange"
+    assert new.user.role == "Straight Midrange"
+    assert new.user.favorite is True
+    assert new.user.tags == ["workhorse"]
+
+    # active bag now holds only the fresh copy
+    active = inv.list_discs()
+    assert [d.id for d in active] == [new.id]
+
+
+def test_replace_overrides_physical_fields(tmp_path):
+    inv = make_inv(tmp_path)
+    old = inv.add(OwnedDisc.from_db_record(MAKO3, plastic="Star", weight=175))
+    new = inv.replace(old, plastic="Champion", weight=171)
+    assert new.user.plastic == "Champion" and new.user.weight == 171
+
+
+def test_replace_defaults_to_retired(tmp_path):
+    inv = make_inv(tmp_path)
+    old = inv.add(OwnedDisc.from_db_record(MAKO3))
+    inv.replace(old)
+    assert old.user.status == "retired"
+
+
 def test_first_used_is_earliest_entry():
     from discbag.inventory import UserData
     u = UserData.from_dict({"use_dates": [

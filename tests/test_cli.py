@@ -193,6 +193,89 @@ def test_cmd_list_hides_archived_unless_requested(tmp_path, capsys):
     assert "Leopard" in capsys.readouterr().out
 
 
+# ---------- lost / damaged / replace lifecycle verbs ----------
+
+def test_cmd_lost_archives_with_lost_status(tmp_path, capsys):
+    inv = _inv_with_mako(tmp_path)
+    inv.record_use("mako3", "2026-07-03T00:00:00+00:00")
+    cli.cmd_lost(_ns(name=["mako3"], reason="hole 7 water"), inv)
+    out = capsys.readouterr().out
+    assert "Lost" in out and "hole 7 water" in out
+    assert inv.list_discs() == []                        # gone from the active bag
+    archived = inv.all_discs()[0].user
+    assert archived.status == "lost" and archived.use_count == 1   # history kept
+
+
+def test_cmd_damaged_flags_but_keeps_carrying(tmp_path, capsys):
+    inv = _inv_with_mako(tmp_path)
+    cli.cmd_damaged(_ns(name=["mako3"], reason="cracked", retire=False, unset=False), inv)
+    out = capsys.readouterr().out
+    assert "damaged" in out.lower()
+    d = inv.list_discs()[0]                               # still active & carried
+    assert d.user.damaged is True and d.user.status == "active"
+
+
+def test_cmd_damaged_retire_archives_as_broken(tmp_path, capsys):
+    inv = _inv_with_mako(tmp_path)
+    cli.cmd_damaged(_ns(name=["mako3"], reason=None, retire=True, unset=False), inv)
+    assert inv.list_discs() == []
+    u = inv.all_discs()[0].user
+    assert u.status == "broken" and u.damaged is True
+
+
+def test_cmd_damaged_unset_clears_the_flag(tmp_path, capsys):
+    inv = _inv_with_mako(tmp_path)
+    inv.set_damaged("mako3", True)
+    cli.cmd_damaged(_ns(name=["mako3"], reason=None, retire=False, unset=True), inv)
+    assert inv.list_discs()[0].user.damaged is False
+
+
+def test_cmd_damaged_rejects_retire_with_unset(tmp_path, capsys):
+    inv = _inv_with_mako(tmp_path)
+    rc = cli.cmd_damaged(_ns(name=["mako3"], reason=None, retire=True, unset=True), inv)
+    assert rc == 1
+    assert inv.list_discs()[0].user.status == "active"   # nothing changed
+
+
+def test_cmd_replace_archives_old_and_adds_fresh(tmp_path, capsys):
+    inv = _inv_with_mako(tmp_path)
+    inv.record_use("mako3", "2026-05-01T00:00:00+00:00")
+    cli.cmd_replace(_ns(name=["mako3"], status="broken", reason="worn",
+                        plastic=None, weight=None, color=None), inv)
+    out = capsys.readouterr().out
+    assert "archived" in out.lower() and "fresh" in out.lower()
+    active = inv.list_discs()
+    assert len(active) == 1 and active[0].user.use_count == 0     # fresh history
+    archived = [d for d in inv.all_discs() if not d.user.is_active]
+    assert archived[0].user.status == "broken" and archived[0].user.use_count == 1
+
+
+def test_cmd_replace_overrides_plastic(tmp_path, capsys):
+    inv = _inv_with_mako(tmp_path)
+    cli.cmd_replace(_ns(name=["mako3"], status=None, reason=None,
+                        plastic="Champion", weight=171, color=None), inv)
+    assert inv.list_discs()[0].user.plastic == "Champion"
+
+
+def test_format_owned_shows_damaged_marker(tmp_path):
+    disc = OwnedDisc.from_db_record(MAKO3)
+    disc.user.damaged = True
+    assert "Damaged" in cli.format_owned(disc)
+
+
+def test_disc_row_shows_damaged_for_active_disc(tmp_path, capsys):
+    disc = OwnedDisc.from_db_record(MAKO3)
+    disc.user.damaged = True
+    cli._print_disc_row(disc)
+    assert "damaged" in capsys.readouterr().out.lower()
+
+
+def test_lost_damaged_replace_are_registered_commands():
+    parser = cli.build_parser()
+    for cmd in ("lost", "damaged", "replace"):
+        assert parser.parse_args([cmd, "mako3"]).func is not None
+
+
 # ---------- home-screen dashboard ----------
 
 def _bag(tmp_path, *records):

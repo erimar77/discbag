@@ -89,6 +89,10 @@ class UserData:
     status: str = "active"
     status_reason: Optional[str] = None
     status_date: Optional[str] = None
+    # Wear flag, orthogonal to status: a disc can be damaged (beat-in, cracked) yet
+    # still "active" and carried. Discs are plastic — replaced, never repaired — so
+    # this is only cleared to correct a mistake, never to model a repair.
+    damaged: bool = False
 
     @classmethod
     def from_dict(cls, data):
@@ -426,6 +430,42 @@ class Inventory:
             if status != "active":
                 u.in_bag = False
         return self._mutate(name, apply)
+
+    def set_damaged(self, name, value, reason=None, when=None):
+        """Set the damaged wear flag. Orthogonal to status — does NOT archive; a
+        damaged disc stays in whatever lifecycle state it was in. A reason (and
+        timestamp), if given, is recorded so the disc's history can tell the story.
+        Returns discs updated."""
+        def apply(u):
+            u.damaged = bool(value)
+            if value and reason is not None:
+                u.status_reason = reason
+            if value and when is not None:
+                u.status_date = when
+        return self._mutate(name, apply)
+
+    def replace(self, disc, status="retired", reason=None, when=None, **overrides):
+        """Replace one physical disc: archive `disc` (an OwnedDisc) with `status`,
+        preserving its history, and add a fresh copy of the same mold. The new copy
+        inherits the bag identity — plastic, weight, color, role, favorite, in_bag,
+        tags — but starts a clean life story (no use history, condition, notes, or
+        damage). ``plastic``/``weight``/``color`` overrides win over the inherited
+        values, for a rebuy in a different run. Returns the new OwnedDisc."""
+        u = disc.user
+        # Capture the inherited identity BEFORE archiving mutates the old copy.
+        new_user = UserData(
+            plastic=overrides.get("plastic") or u.plastic,
+            weight=overrides["weight"] if overrides.get("weight") is not None else u.weight,
+            color=overrides.get("color") or u.color,
+            role=u.role,
+            favorite=u.favorite,
+            in_bag=u.in_bag,
+            tags=list(u.tags),
+        )
+        new = OwnedDisc(brand=disc.brand, mold=disc.mold,
+                        cached=Disc.from_dict(disc.cached.to_dict()), user=new_user)
+        self.set_status(disc, status, reason=reason, when=when)
+        return self.add(new)
 
     def record_use(self, name, when, session_type="round"):
         """Record that a disc was used at timestamp `when` in a session of the given

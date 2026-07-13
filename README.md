@@ -178,10 +178,29 @@ story. So discbag never throws history away when a disc leaves your bag. Every d
 `broken`) with an optional reason:
 
 ```text
-$ discbag remove leopard --status lost --reason "Woodland Park hole 18"
-Disc archived.
-  Status: Lost
+$ discbag lost leopard --reason "Woodland Park hole 18"
+Marked Innova Leopard as Lost.
   Reason: Woodland Park hole 18
+```
+
+The two things that actually happen to a disc get plain-spoken verbs. `lost <disc>` archives
+it as lost. `damaged <disc>` is subtler, because a beat-in disc is often *still in play*: it
+flags the disc as damaged but **keeps it in your bag** and in every recommendation, just
+visibly marked. When it's finally worn beyond use, `damaged <disc> --retire` archives it. And
+because a disc is plastic — replaced, never repaired — there is no "repair"; a mistaken flag
+clears with `damaged <disc> --unset`. (`remove <disc> --status …` still archives with any
+status directly, if you prefer.)
+
+When you buy a fresh copy, `replace <disc>` does the whole dance at once — archives the old
+disc (keeping its history) and adds a brand-new copy of the same mold with a **clean** history,
+carrying over its plastic/weight/color/role/tags. A new disc flies differently from a beat one,
+so it earns its own story rather than inheriting the old one's:
+
+```text
+$ discbag replace firebird --status broken --reason "worn out"
+Replaced Innova Firebird.
+  Old copy archived (Broken), history kept.
+  New copy added [Champion] — fresh history.
 ```
 
 Archived discs drop out of your **active inventory** — `recommend`, `build-bag`, `bag`,
@@ -189,7 +208,7 @@ Archived discs drop out of your **active inventory** — `recommend`, `build-bag
 lives on. `history <disc>` recalls it forever (status, reason, uses, rounds, practices,
 first and last used), `list --all` (or `--status lost`) surfaces archived discs, and
 `restore` brings one back if you find it or trade for it again. Only `delete` truly erases a
-disc, and it asks first. `remove` is safe by default; deletion is the deliberate exception.
+disc, and it asks first. These verbs are safe by default; deletion is the deliberate exception.
 
 ### Two of the same mold are two different discs
 
@@ -236,12 +255,16 @@ discbag add <name> [--plastic --weight --color --condition --location --notes --
 discbag list [--tag <t>] [--favorite] [--in-bag] [--status <s>] [--all]
 discbag show <name>                 # your data + flight + role + power + how it plays for you
 discbag remove <name> [--status lost|sold|gifted|broken|retired] [--reason "..."]
+discbag lost <name> [--reason "..."]        # archive as lost
+discbag damaged <name> [--reason "..."] [--retire | --unset]   # flag (kept in bag), or archive/clear
+discbag replace <name> [--status <s>] [--reason "..."] [--plastic --weight --color]
 discbag restore <name>              # bring an archived disc back to the active bag
 discbag history <name>              # a disc's full story, even after it leaves the bag
 discbag delete <name> [--yes]       # permanently erase a disc and its history (confirms first)
 ```
 
-`remove` **archives** rather than deletes — see the disc lifecycle below.
+`remove`, `lost`, `damaged --retire`, and `replace` **archive** rather than delete — see the
+disc lifecycle below. `damaged` (without `--retire`) keeps the disc in your active bag.
 
 ### Personalize
 ```bash

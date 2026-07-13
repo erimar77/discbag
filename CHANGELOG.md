@@ -7,6 +7,17 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- First-class verbs for marking discs lost or damaged. `lost <disc>` archives a disc as lost
+  (keeping its history, `restore`-able if found). `damaged <disc>` flags a disc as damaged but
+  **keeps it active and in your bag** — a beat-in disc is often still in play — and it still
+  counts in every recommendation, just visibly marked in `list`/`show`. `damaged --retire`
+  archives it (as broken) once it's worn beyond use; `damaged --unset` clears a mistaken flag
+  (discs are plastic — replaced, never repaired). `replace <disc>` archives the old copy and
+  adds a fresh copy of the same mold with a **clean** history, carrying over its
+  plastic/weight/color/role/favorite/tags (`--plastic`/`--weight`/`--color` override), because
+  a new disc flies differently from a beat one and deserves its own story. A new `damaged`
+  wear flag on user data is orthogonal to lifecycle status and defaults off; older inventory
+  files load unchanged.
 - Individual disc identity. Every disc gets a permanent internal id when added (existing
   inventories are migrated automatically, no interaction needed), so two copies of the same
   mold keep separate histories, lifecycle, favorites, notes, and flight. Single-disc commands
