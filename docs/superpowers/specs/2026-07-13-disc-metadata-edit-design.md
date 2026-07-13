@@ -114,6 +114,13 @@ which prints each copy's id. Most users never need this — the interactive prom
 the default. Power users and scripts opt in explicitly, then target with
 `discbag edit --id <id> ...`.
 
+## Out of scope (future)
+
+- **`discbag edit --interactive`** — a guided mode that walks through the editable fields
+  one at a time (showing current values, blank to keep). A nice quality-of-life
+  enhancement, but deliberately excluded from this first version. It is purely additive
+  and can layer on top of `update_metadata()` later without changing the API.
+
 ## Inventory API
 
 ```python
