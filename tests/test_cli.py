@@ -550,3 +550,31 @@ def test_cmd_edit_by_id_targets_one_copy(tmp_path, capsys, monkeypatch):
     cli.cmd_edit(_edit_ns(id=target.id, plastic="Star"), inv)
     assert inv.find_by_id(target.id).user.plastic == "Star"
     assert inv.all_discs()[0].user.plastic == ""       # the other copy untouched
+
+
+ROADRUNNER = {"name": "Roadrunner", "brand": "Innova", "category": "Fairway",
+              "speed": 9, "glide": 5, "turn": -4, "fade": 1,
+              "stability": "Understable"}
+
+
+def test_cmd_edit_identity_change_prints_match_success(tmp_path, capsys, monkeypatch):
+    from discbag import inventory
+    monkeypatch.setattr(cli.db, "load_db", lambda: {"discs": [ROADRUNNER]})
+    inv = inventory.Inventory(path=tmp_path / "inventory.json")
+    typo = {"name": "Roadruner", "brand": "Innova", "category": "Fairway",
+            "speed": 0, "glide": 0, "turn": 0, "fade": 0, "stability": ""}
+    inv.add(OwnedDisc.from_db_record(typo))
+    disc = inv.all_discs()[0]
+    cli.cmd_edit(_edit_ns(id=disc.id, mold="Roadrunner"), inv)
+    out = capsys.readouterr().out
+    assert "Matched:" in out
+    assert "9/5/-4/1" in out
+
+
+def test_cmd_edit_identity_change_no_match_warns_on_stderr(tmp_path, capsys, monkeypatch):
+    monkeypatch.setattr(cli.db, "load_db", lambda: {"discs": []})
+    inv = _inv_with_mako(tmp_path)
+    rc = cli.cmd_edit(_edit_ns(name=["mako3"], mold="Nonexistent Mold"), inv)
+    assert rc == 0
+    assert inv.all_discs()[0].mold == "Nonexistent Mold"
+    assert "no database match" in capsys.readouterr().err.lower()

@@ -193,7 +193,8 @@ class OwnedDisc:
     cached: Disc
     user: UserData = field(default_factory=UserData)
     # A permanent per-copy identifier so two discs of the same mold keep separate
-    # histories. Assigned on add; an internal detail users never see or type.
+    # histories. Assigned on add; normally hidden, but `list --ids` reveals it
+    # and `edit --id` lets users target a copy by it directly.
     id: str = ""
 
     # --- manufacturer accessors delegate to the cached mold snapshot ---

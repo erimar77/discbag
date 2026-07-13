@@ -508,3 +508,35 @@ def test_update_metadata_identity_change_no_match_keeps_cached(tmp_path):
     d = inv.all_discs()[0]
     assert d.mold == "Nonexistent Mold"            # string still applied
     assert (d.speed, d.glide, d.turn, d.fade) == before   # cached untouched
+
+
+def test_update_metadata_identity_change_brand_refreshes_cached(tmp_path):
+    inv = make_inv(tmp_path)
+    # Added under a wrong brand with placeholder flight numbers.
+    wrong_brand = {"name": "Roadrunner", "brand": "Discraft", "category": "Fairway",
+                   "speed": 0, "glide": 0, "turn": 0, "fade": 0, "stability": ""}
+    inv.add(OwnedDisc.from_db_record(wrong_brand))
+    disc = inv.all_discs()[0]
+    identity_changed, matched = inv.update_metadata(
+        disc, brand="Innova", db_discs=[ROADRUNNER])
+    assert identity_changed is True
+    assert matched is not None
+    d = inv.all_discs()[0]
+    assert d.brand == "Innova"
+    assert (d.speed, d.glide, d.turn, d.fade) == (9, 5, -4, 1)
+
+
+def test_update_metadata_notes_empty_string_clears_none_leaves_unchanged(tmp_path):
+    inv = make_inv(tmp_path)
+    inv.add(OwnedDisc.from_db_record(MAKO3))
+    disc = inv.all_discs()[0]
+    inv.update_metadata(disc, notes="temp")
+    assert inv.all_discs()[0].user.notes == "temp"
+
+    disc = inv.all_discs()[0]
+    inv.update_metadata(disc, notes=None)
+    assert inv.all_discs()[0].user.notes == "temp"          # None leaves unchanged
+
+    disc = inv.all_discs()[0]
+    inv.update_metadata(disc, notes="")
+    assert inv.all_discs()[0].user.notes == ""               # "" clears it

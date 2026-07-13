@@ -235,8 +235,9 @@ safe by default; deletion is the deliberate exception.
 
 A mold is a product; a disc is a physical object. Your two Roadrunners each develop their
 own wear, flight, history, and confidence, so `discbag` gives every disc a permanent
-internal identity when you add it and keeps those histories apart. You never see or type
-that identity — the experience stays natural:
+internal identity when you add it and keeps those histories apart. You normally don't need to
+see or type that identity — the experience stays natural — but you can reveal ids with
+`discbag list --ids` and target one directly with `discbag edit --id`:
 
 ```text
 $ discbag show roadrunner
