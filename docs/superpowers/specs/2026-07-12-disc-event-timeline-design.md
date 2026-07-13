@@ -36,10 +36,12 @@ Principles:
 Add to `UserData` (`discbag/inventory.py`):
 
 ```python
-events: Optional[List] = None   # None = never seeded; [] = seeded, legitimately empty
+events: Optional[List] = None   # None = legacy disc needing seeding; list = seeded
 ```
 
-Each event is a structured dict (not a pre-baked string, so the renderer can evolve):
+Each event is a structured dict (not a pre-baked string, so the renderer can evolve). The
+expected schema, documented as an internal `TypedDict` (`total=False`) for clarity even
+though persistence stays plain dicts:
 
 | type | fields | example |
 |------|--------|---------|
@@ -49,10 +51,21 @@ Each event is a structured dict (not a pre-baked string, so the renderer can evo
 | `damaged` | `date`, `reason` | plain damage flag set |
 | `damaged_retired` | `date`, `reason` | atomic `damaged --retire` |
 
-`date` is the date portion (`YYYY-MM-DD`) of the source timestamp. The `None` sentinel
-distinguishes a disc that predates the feature (needs seeding) from one seeded with no
-derivable events (`[]`). Accessors guard with `self.events or []`. `to_dict` always writes a
-list once seeded, so persisted files never carry `None`.
+`date` is the date portion (`YYYY-MM-DD`) of the source timestamp.
+
+**Event initialization — `None` means exactly "needs seeding":**
+
+- **Newly created discs always start with `events=[]`** — `add()` initializes the list (and
+  appends the `added` event), so a disc created through the code never carries `None`.
+- **Only legacy discs loaded from pre-feature data may have `events=None`**, which the loader
+  treats as the signal to seed. After seeding, `events` is a list (possibly empty).
+
+Accessors guard with `self.events or []`. `to_dict` always writes a list once seeded, so
+persisted files never carry `None`.
+
+**Forward compatibility:** the renderer **ignores unknown event types** (and unknown fields)
+rather than failing, so a newer event kind written by a later version degrades gracefully in
+an older one.
 
 ## Seeding (one-time backfill at load)
 
@@ -66,12 +79,23 @@ Seed sources (real timestamps only):
 - `added` from `date_added` (omit if absent).
 - one `use` per `use_dates` entry.
 - one `status` event from `status_date` when `status != "active"` (omit if no `status_date`).
-- one `damaged` event when `damaged and is_active and status_date` (rare; effectively no
-  pre-existing damaged discs).
+  A seeded `status` event represents the **last known transition into the current status**,
+  not a complete historical record — legacy data only ever stored the latest one.
 
-Deliberately **not** seeded: favorite, flight, role, tag — no timestamp was ever stored.
+Deliberately **not** seeded:
+
+- **Damage.** A pre-feature disc's `status_date` was not necessarily written when the damage
+  occurred, so seeding a `damaged` event from it would invent a timestamp — forbidden. An
+  existing damaged disc simply stays "currently damaged" in the summary; no historical damage
+  event is synthesized. Damage is recorded normally from the first live mutation onward.
+- **favorite, flight, role, tag** — no timestamp was ever stored.
 
 ## Live recording (this phase)
+
+**Ownership: `Inventory` methods are the sole recorders of events.** CLI commands never append
+events directly — they call inventory methods, which append. This keeps recording in one place
+and avoids duplicate events when an inventory method is reused elsewhere (e.g. `replace` reuses
+`set_status` and `add`).
 
 The mutations that already carry a timestamp record their event as they happen:
 
@@ -113,6 +137,11 @@ Label mapping:
 | damaged | `Damaged` |
 | damaged_retired | `Damaged and retired` |
 
+Every status value `set_status()` can persist has a label: `active`, `lost`, `retired`,
+`broken`, `sold`, `gifted` (the `_ARCHIVE_STATUSES` list plus `active`). A test asserts this
+mapping stays exhaustive, so adding a status without a label fails loudly. An unknown status —
+or an unknown event `type` — is skipped rather than rendered as a crash or a raw value.
+
 A `reason`, when present, is appended as ` (reason)` — e.g. `Lost (hole 7 water)`.
 Undated events (no `date`) are omitted from the rendered timeline.
 
@@ -131,7 +160,9 @@ History
 - one label per event type, including reason suffixes and `Restored`.
 - oldest-first ordering; same-day events keep insertion order.
 - `damaged_retired` renders as the single combined line.
-- undated events are dropped.
+- undated events are dropped; unknown event `type` and unknown status are skipped, not raised.
+- every status in `_ARCHIVE_STATUSES` + `active` has a label (guards against a future status
+  slipping through unlabelled).
 
 **`tests/test_inventory.py`**:
 - `add` / `record_use` / `set_status` / `set_damaged(True)` each append the right event;
@@ -139,8 +170,8 @@ History
 - `retire_damaged` sets `damaged`+`broken`+`in_bag=False` and logs exactly one
   `damaged_retired` event.
 - seeding: an old disc (`events` absent, with `date_added`/`use_dates`/archived status) is
-  seeded from those timestamps; reload does not reseed or duplicate; favorite/flight/role
-  are not seeded.
+  seeded from those timestamps; reload does not reseed or duplicate; damage, favorite, flight,
+  role, and tag are **not** seeded (a legacy damaged disc gets no historical damage event).
 
 **`tests/test_cli.py`**:
 - `history` prints the summary *and* a timeline including a use and a lifecycle event.
