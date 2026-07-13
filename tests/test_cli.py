@@ -482,3 +482,55 @@ def test_sync_no_arg_refreshes_whole_bag(tmp_path, monkeypatch):
     cli.cmd_sync(_ns(disc=None, all=False), inv)
     fades = sorted(d.fade for d in inv.list_discs())
     assert fades == [2, 4]
+
+
+def _two_makos(tmp_path):
+    from discbag import inventory
+    inv = inventory.Inventory(path=tmp_path / "inventory.json")
+    inv.add(OwnedDisc.from_db_record(MAKO3))
+    inv.add(OwnedDisc.from_db_record(MAKO3))
+    return inv
+
+
+def _edit_ns(**over):
+    base = dict(name=[], id=None, manufacturer=None, mold=None, plastic=None,
+                weight=None, color=None, condition=None, notes=None)
+    base.update(over)
+    return _ns(**base)
+
+
+def test_cmd_edit_updates_metadata_in_place(tmp_path, capsys, monkeypatch):
+    monkeypatch.setattr(cli.db, "load_db", lambda: {"discs": []})
+    inv = _inv_with_mako(tmp_path)
+    cli.cmd_edit(_edit_ns(name=["mako3"], plastic="Champion", weight=171,
+                          color="Orange"), inv)
+    u = inv.all_discs()[0].user
+    assert u.plastic == "Champion" and u.weight == 171 and u.color == "Orange"
+    assert "Updated" in capsys.readouterr().out
+
+
+def test_cmd_edit_requires_a_field(tmp_path, capsys):
+    inv = _inv_with_mako(tmp_path)
+    rc = cli.cmd_edit(_edit_ns(name=["mako3"]), inv)
+    assert rc == 1
+    assert "at least one field" in capsys.readouterr().err.lower()
+    assert inv.all_discs()[0].user.plastic == ""       # nothing changed
+
+
+def test_cmd_edit_ambiguous_name_errors_without_guessing(tmp_path, capsys, monkeypatch):
+    monkeypatch.setattr(cli.db, "load_db", lambda: {"discs": []})
+    inv = _two_makos(tmp_path)
+    rc = cli.cmd_edit(_edit_ns(name=["mako3"], plastic="Star"), inv)
+    assert rc == 1
+    combined = capsys.readouterr()
+    assert "match" in (combined.out + combined.err).lower()
+    assert all(d.user.plastic == "" for d in inv.all_discs())   # neither modified
+
+
+def test_cmd_edit_by_id_targets_one_copy(tmp_path, capsys, monkeypatch):
+    monkeypatch.setattr(cli.db, "load_db", lambda: {"discs": []})
+    inv = _two_makos(tmp_path)
+    target = inv.all_discs()[1]
+    cli.cmd_edit(_edit_ns(id=target.id, plastic="Star"), inv)
+    assert inv.find_by_id(target.id).user.plastic == "Star"
+    assert inv.all_discs()[0].user.plastic == ""       # the other copy untouched

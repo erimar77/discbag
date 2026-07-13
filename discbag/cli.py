@@ -447,6 +447,59 @@ def cmd_replace(args, inv):
     return 0
 
 
+def cmd_edit(args, inv):
+    """Correct a disc's inventory metadata in place (plastic, color, weight,
+    condition, notes, or the manufacturer/mold identity). Metadata correction
+    only: it changes nothing about the disc's career and logs no history event.
+    Changing the manufacturer/mold refreshes the cached flight numbers from the
+    database. A unique name is edited directly; an ambiguous name prompts (or is
+    a hard error non-interactively); `--id` targets one copy for scripting."""
+    edits = {
+        "brand": args.manufacturer,
+        "mold": args.mold,
+        "plastic": args.plastic,
+        "weight": args.weight,
+        "color": args.color,
+        "condition": args.condition,
+        "notes": args.notes,
+    }
+    if all(v is None for v in edits.values()):
+        print("Nothing to edit — pass at least one field, e.g. --plastic Champion.",
+              file=sys.stderr)
+        return 1
+
+    disc_id = getattr(args, "id", None)
+    if disc_id:
+        disc = inv.find_by_id(disc_id)
+        if disc is None:
+            print(f"No disc with id '{disc_id}'.", file=sys.stderr)
+            return 1
+    else:
+        name = " ".join(args.name).strip() if args.name else ""
+        if not name:
+            print("Name a disc to edit, or pass --id.", file=sys.stderr)
+            return 1
+        targets = _resolve(inv, name, include_archived=True)
+        if targets is None:
+            return 1
+        disc = targets[0]
+
+    db_discs = db.load_db().get("discs", [])
+    identity_changed, matched = inv.update_metadata(disc, db_discs=db_discs, **edits)
+
+    print(f"Updated {disc.brand} {disc.name}.")
+    if identity_changed:
+        if matched is not None:
+            print(f"  Matched: {matched['brand']} {matched['name']} "
+                  f"({matched['speed']}/{matched['glide']}/"
+                  f"{matched['turn']}/{matched['fade']})")
+        else:
+            print("  Warning: no database match for the new identity; flight "
+                  "numbers left unchanged. Run 'discbag updatedb' or check the "
+                  "spelling.", file=sys.stderr)
+    return 0
+
+
 def cmd_history(args, inv):
     """A disc's full story — active or archived — including its lifecycle status."""
     name = " ".join(args.name).strip()
@@ -1320,6 +1373,7 @@ _HELP_GROUPS = [
         ("favorite", "mark a disc as a favorite"),
         ("tag / untag", "add or remove a tag"),
         ("role", "set a personal role label"),
+        ("edit", "correct a disc's metadata (no history event)"),
     ]),
     ("Analysis", [
         ("round-used / used", "record a round"),
@@ -1429,6 +1483,20 @@ def build_parser():
     p_repl.add_argument("--weight", type=int, help="override the new copy's weight (grams)")
     p_repl.add_argument("--color", help="override the new copy's color")
     p_repl.set_defaults(func=cmd_replace)
+
+    p_edit = sub.add_parser("edit",
+                            help="correct a disc's inventory metadata (no history event)")
+    p_edit.add_argument("name", nargs="*", help="disc name (omit if using --id)")
+    p_edit.add_argument("--id", dest="id",
+                        help="target one copy by id (discover ids with 'list --ids')")
+    p_edit.add_argument("--manufacturer", help="correct the manufacturer/brand")
+    p_edit.add_argument("--mold", help="correct the mold name")
+    p_edit.add_argument("--plastic")
+    p_edit.add_argument("--weight", type=int)
+    p_edit.add_argument("--color")
+    p_edit.add_argument("--condition", help="e.g. New, Used, Beat-in")
+    p_edit.add_argument("--notes")
+    p_edit.set_defaults(func=cmd_edit)
 
     p_hist = sub.add_parser("history", help="a disc's full story, even after it leaves the bag")
     p_hist.add_argument("name", nargs="+")
