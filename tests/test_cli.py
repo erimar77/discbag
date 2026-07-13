@@ -183,6 +183,27 @@ def test_cmd_history_reports_status_reason_and_sessions(tmp_path, capsys):
     assert "2026-05-01" in out            # first used
 
 
+def test_cmd_history_prints_summary_and_timeline(tmp_path, capsys):
+    inv = _inv_with_mako(tmp_path)
+    inv.record_use("mako3", "2026-07-13T00:00:00+00:00", session_type="practice")
+    inv.set_status("mako3", "lost", reason="hole 7 water", when="2026-09-18T00:00:00+00:00")
+    cli.cmd_history(_ns(name=["mako3"]), inv)
+    out = capsys.readouterr().out
+    assert "Status: Lost" in out                     # summary block, unchanged
+    assert "History" in out                          # timeline section
+    assert "2026-07-13  Practice session (+1)" in out
+    assert "2026-09-18  Lost (hole 7 water)" in out
+
+
+def test_cmd_history_damaged_retire_is_one_combined_line(tmp_path, capsys):
+    inv = _inv_with_mako(tmp_path)
+    cli.cmd_damaged(_ns(name=["mako3"], reason=None, retire=True, unset=False), inv)
+    cli.cmd_history(_ns(name=["mako3"]), inv)
+    out = capsys.readouterr().out
+    assert "Damaged and retired" in out
+    assert out.count("Damaged and retired") == 1     # single atomic event, one line
+
+
 def test_cmd_list_hides_archived_unless_requested(tmp_path, capsys):
     inv = _inv_with_mako(tmp_path)
     inv.add(OwnedDisc.from_db_record(dict(MAKO3, name="Leopard", speed=6)))

@@ -205,10 +205,31 @@ Replaced Innova Firebird.
 
 Archived discs drop out of your **active inventory** — `recommend`, `build-bag`, `bag`,
 `choose`, `chart`, and `show` only ever reason about discs still in play — but their record
-lives on. `history <disc>` recalls it forever (status, reason, uses, rounds, practices,
-first and last used), `list --all` (or `--status lost`) surfaces archived discs, and
-`restore` brings one back if you find it or trade for it again. Only `delete` truly erases a
-disc, and it asks first. These verbs are safe by default; deletion is the deliberate exception.
+lives on. `history <disc>` recalls it forever: a summary (status, reason, uses, rounds,
+practices, first and last used) followed by a **chronological timeline** of what actually
+happened — when it was added, each round and practice, and every lifecycle change:
+
+```text
+$ discbag history leopard
+Innova Leopard
+  Status: Sold
+  ...
+
+History
+
+  2026-05-01  Added
+  2026-05-10  Round (+1)
+  2026-06-02  Practice session (+1)
+  2026-06-20  Sold (traded to a friend)
+```
+
+The timeline is a real, persisted event log, not a guess: each event is recorded as it
+happens. Discs that predate the log are seeded once from timestamps already on file (added,
+uses, the last known status change) — never from data that was never recorded. (Favorite,
+flight, role, and tag changes join the timeline in a later phase.) `list --all` (or
+`--status lost`) surfaces archived discs, and `restore` brings one back if you find it or
+trade for it again. Only `delete` truly erases a disc, and it asks first. These verbs are
+safe by default; deletion is the deliberate exception.
 
 ### Two of the same mold are two different discs
 

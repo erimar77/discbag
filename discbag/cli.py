@@ -4,7 +4,7 @@ import argparse
 import sys
 from datetime import datetime, timezone
 
-from discbag import db, player
+from discbag import db, history, player
 from discbag.inventory import Disc, Inventory, OwnedDisc
 
 
@@ -467,6 +467,14 @@ def cmd_history(args, inv):
     if u.status_reason:
         print(f"  Reason: {u.status_reason}")
     print()
+
+    events = history.timeline(u)
+    if events:
+        print("History\n")
+        width = max(len(date) for date, _ in events)
+        for date, label in events:
+            print(f"  {date:<{width}}  {label}")
+        print()
     return 0
 
 

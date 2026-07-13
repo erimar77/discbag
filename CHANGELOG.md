@@ -7,6 +7,14 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- A history timeline. `history <disc>` now prints its summary followed by a chronological
+  list of what happened to the disc — when it was added, each round and practice, and every
+  lifecycle change (lost, retired, broken, sold, gifted, restored, damaged, and the atomic
+  "damaged and retired"). It is backed by a real persisted per-disc **event log** recorded as
+  each mutation happens. Discs that predate the log are seeded once from timestamps already on
+  file (added, uses, the last known status transition); damage, favorite, flight, role, and
+  tag are never seeded — no timestamp was stored and history is never invented. Favorite,
+  flight, role, and tag events join the timeline in a later phase.
 - First-class verbs for marking discs lost or damaged. `lost <disc>` archives a disc as lost
   (keeping its history, `restore`-able if found). `damaged <disc>` flags a disc as damaged but
   **keeps it active and in your bag** — a beat-in disc is often still in play — and it still
