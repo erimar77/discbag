@@ -553,8 +553,11 @@ def cmd_list(args, inv):
         return 0
     label = "matching" if narrowed else "discs"
     print(f"Your bag ({len(discs)} {label}):\n")
+    show_ids = getattr(args, "ids", False)
     for d in discs:
         _print_disc_row(d)
+        if show_ids:
+            print(f"      id: {d.id}")
     return 0
 
 
@@ -1511,6 +1514,8 @@ def build_parser():
                         help="only discs with this lifecycle status")
     p_list.add_argument("--all", action="store_true",
                         help="include archived discs (lost, sold, retired, …)")
+    p_list.add_argument("--ids", action="store_true",
+                        help="show each disc's internal id (for 'edit --id')")
     p_list.set_defaults(func=cmd_list)
 
     p_show = sub.add_parser("show", help="show details for a disc in your bag")

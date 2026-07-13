@@ -208,10 +208,26 @@ def test_cmd_list_hides_archived_unless_requested(tmp_path, capsys):
     inv = _inv_with_mako(tmp_path)
     inv.add(OwnedDisc.from_db_record(dict(MAKO3, name="Leopard", speed=6)))
     inv.set_status("leopard", "sold")
-    cli.cmd_list(_ns(tag=None, favorite=False, in_bag=False, status=None, all=False), inv)
+    cli.cmd_list(_ns(tag=None, favorite=False, in_bag=False, status=None, all=False, ids=False), inv)
     assert "Leopard" not in capsys.readouterr().out
-    cli.cmd_list(_ns(tag=None, favorite=False, in_bag=False, status=None, all=True), inv)
+    cli.cmd_list(_ns(tag=None, favorite=False, in_bag=False, status=None, all=True, ids=False), inv)
     assert "Leopard" in capsys.readouterr().out
+
+
+def test_cmd_list_ids_shows_ids(tmp_path, capsys):
+    inv = _inv_with_mako(tmp_path)
+    the_id = inv.all_discs()[0].id
+    cli.cmd_list(_ns(tag=None, favorite=False, in_bag=False, status=None,
+                     all=False, ids=True), inv)
+    assert the_id in capsys.readouterr().out
+
+
+def test_cmd_list_hides_ids_by_default(tmp_path, capsys):
+    inv = _inv_with_mako(tmp_path)
+    the_id = inv.all_discs()[0].id
+    cli.cmd_list(_ns(tag=None, favorite=False, in_bag=False, status=None,
+                     all=False, ids=False), inv)
+    assert the_id not in capsys.readouterr().out
 
 
 # ---------- lost / damaged / replace lifecycle verbs ----------
