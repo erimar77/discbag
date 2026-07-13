@@ -7,6 +7,11 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- `discbag edit` corrects a disc's inventory metadata (plastic, weight, color, condition,
+  notes, manufacturer, mold) in place, without creating a history event. Changing the
+  manufacturer/mold refreshes cached flight numbers from the database.
+- `discbag list --ids` prints each disc's internal id, for targeting a specific copy with
+  `discbag edit --id`.
 - A history timeline. `history <disc>` now prints its summary followed by a chronological
   list of what happened to the disc — when it was added, each round and practice, and every
   lifecycle change (lost, retired, broken, sold, gifted, restored, damaged, and the atomic

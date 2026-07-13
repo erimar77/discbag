@@ -273,8 +273,10 @@ always override the modelled behavior.
 ### Your bag
 ```bash
 discbag add <name> [--plastic --weight --color --condition --location --notes --yes]
-discbag list [--tag <t>] [--favorite] [--in-bag] [--status <s>] [--all]
+discbag list [--tag <t>] [--favorite] [--in-bag] [--status <s>] [--all] [--ids]
 discbag show <name>                 # your data + flight + role + power + how it plays for you
+discbag edit <name> [--plastic --weight --color --condition --notes --manufacturer --mold]
+                    [--id <id>]      # correct metadata in place; no history event
 discbag remove <name> [--status lost|sold|gifted|broken|retired] [--reason "..."]
 discbag lost <name> [--reason "..."]        # archive as lost
 discbag damaged <name> [--reason "..."] [--retire | --unset]   # flag (kept in bag), or archive/clear
@@ -283,6 +285,12 @@ discbag restore <name>              # bring an archived disc back to the active 
 discbag history <name>              # a disc's full story, even after it leaves the bag
 discbag delete <name> [--yes]       # permanently erase a disc and its history (confirms first)
 ```
+
+`edit` fixes or fills in a disc's physical details after adding it — plastic, weight, color,
+condition, notes, or the manufacturer/mold identity — without touching its career or logging
+a history event; changing the manufacturer/mold re-derives the disc's cached flight numbers
+from the database. An ambiguous name prompts (or errors non-interactively) same as other
+single-disc commands; `list --ids` surfaces ids so `edit --id` can target one copy directly.
 
 `remove`, `lost`, `damaged --retire`, and `replace` **archive** rather than delete — see the
 disc lifecycle below. `damaged` (without `--retire`) keeps the disc in your active bag.
