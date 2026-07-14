@@ -316,7 +316,25 @@ def test_set_damaged_flags_without_archiving(tmp_path):
     d = inv.list_discs()[0]                 # still active — not removed from the bag
     assert d.user.damaged is True
     assert d.user.status == "active"
-    assert d.user.status_reason == "cracked rim"
+    # Damage metadata belongs to the event log, not the lifecycle status fields.
+    assert d.user.status_reason is None
+    assert d.user.status_date is None
+    assert any(e["type"] == "damaged" and e["reason"] == "cracked rim"
+               for e in (d.user.events or []))
+
+
+def test_damaging_preserves_existing_lifecycle_reason(tmp_path):
+    inv = make_inv(tmp_path)
+    inv.add(OwnedDisc.from_db_record(MAKO3))
+    disc = inv.all_discs()[0]
+    inv.set_status(disc, "lost", reason="left at hole 7",
+                   when="2026-06-01T00:00:00+00:00")
+    inv.set_damaged(disc, True, reason="cracked rim",
+                    when="2026-07-01T00:00:00+00:00")
+    u = inv.all_discs()[0].user
+    assert u.status == "lost"
+    assert u.status_reason == "left at hole 7"          # untouched by damaging
+    assert u.status_date == "2026-06-01T00:00:00+00:00"
 
 
 def test_set_damaged_can_be_cleared(tmp_path):

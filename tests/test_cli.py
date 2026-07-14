@@ -252,6 +252,16 @@ def test_cmd_damaged_flags_but_keeps_carrying(tmp_path, capsys):
     assert d.user.damaged is True and d.user.status == "active"
 
 
+def test_history_active_damaged_disc_shows_no_lifecycle_reason(tmp_path, capsys):
+    inv = _inv_with_mako(tmp_path)
+    cli.cmd_damaged(_ns(name=["mako3"], reason="cracked rim", retire=False, unset=False), inv)
+    capsys.readouterr()                                  # discard the damaged output
+    cli.cmd_history(_ns(name=["mako3"]), inv)
+    out = capsys.readouterr().out
+    assert "Status: Active" in out
+    assert "Reason:" not in out          # active disc has no lifecycle reason line
+
+
 def test_cmd_damaged_retire_archives_as_broken(tmp_path, capsys):
     inv = _inv_with_mako(tmp_path)
     cli.cmd_damaged(_ns(name=["mako3"], reason=None, retire=True, unset=False), inv)

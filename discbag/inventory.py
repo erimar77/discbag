@@ -506,15 +506,14 @@ class Inventory:
     def set_damaged(self, name, value, reason=None, when=None):
         """Set the damaged wear flag. Orthogonal to status — does NOT archive; a
         damaged disc stays in whatever lifecycle state it was in. A reason (and
-        timestamp), if given, is recorded so the disc's history can tell the story.
+        timestamp), if given, is recorded in the event log so the disc's history
+        can tell the story. Damage never touches the lifecycle status fields
+        (status_reason/status_date) — those belong to lost/sold/retired, and
+        overwriting them would corrupt an archived disc's real reason.
         Returns discs updated."""
         def apply(u):
             u.damaged = bool(value)
             if value:
-                if reason is not None:
-                    u.status_reason = reason
-                if when is not None:
-                    u.status_date = when
                 u.log_event(_damaged_event(when, reason))
             # Clearing the flag (mistake fix) is not itself a story event.
         return self._mutate(name, apply)
