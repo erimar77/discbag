@@ -10,9 +10,9 @@
 - **Decision-support engine** — build smarter bags, compare discs, spot overlap, and get a
   *reasoned* answer to what to throw, practice, or buy next.
 
-It isn't just a flight-number lookup. `discbag` learns what **your** collection actually does —
-how each disc flies for your arm, which ones you trust, and where your bag has gaps — and every
-recommendation comes with a reason.
+Unlike a catalog of molds, `discbag` follows the life of every individual disc you own. It learns
+how **your** collection actually performs: how each disc flies for your arm, which ones you trust,
+where your bag has gaps, and why it recommends one disc over another.
 
 ```text
 $ discbag recommend --next
@@ -59,9 +59,9 @@ discbag --help                          # the full, grouped command reference
 
 ---
 
-## Three ideas
+## The three pillars
 
-`discbag` grew from a simple bag list into three complementary pieces. Understanding them is the
+`discbag` grew from a simple bag list into three complementary pillars. Understanding them is the
 whole mental model.
 
 **Inventory — what a disc _is_.** Every disc separates **manufacturer data** (mold, flight
@@ -73,7 +73,9 @@ the disc's life — `edit` never writes to its history.
 **History — what a disc _has done_.** Rounds, practice sessions, and lifecycle changes are recorded
 as they happen, in a persisted event log. A disc's story outlives the disc: when one is lost, sold,
 or retired it leaves your bag but keeps its record forever, because a beat-in disc you threw for
-three seasons is part of your development. Metadata is corrected; history is only ever appended.
+three seasons is part of your development.
+
+**Metadata is corrected. History is only ever appended.**
 
 **Analysis — what to do next.** From your inventory and history, `discbag` reasons about **roles**
 (the jobs a bag needs filled), how each disc flies **for you**, and which discs you actually trust —
@@ -89,7 +91,7 @@ event log.
 
 ## The home screen
 
-Run `discbag` with no arguments for a glanceable dashboard — not documentation. Every line is real
+Run `discbag` with no arguments for a glanceable dashboard of your collection. Every line is real
 engine output, pulled from the same functions the individual commands use.
 
 ```text
@@ -378,8 +380,8 @@ sum to the points shown, and only lists components the engine actually used.
 
 ## Architecture
 
-One reusable engine backs every command — coverage, player ability, and ranking are decided in one
-place, not duplicated per command.
+One reusable engine backs every command: coverage, player ability, and ranking live in one place,
+not per command.
 
 | Module | Responsibility |
 |--------|----------------|
