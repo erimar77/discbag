@@ -136,6 +136,20 @@ def test_verdict_how_to_use_has_softened_fade_caveat():
     assert "Expect the Wraith to finish left more strongly than the Wave" in v
 
 
+def test_verdict_equal_stability_uses_direct_flight_language():
+    # Same derived stability (turn+fade=1), different turn/fade split. An over/under
+    # "reach for" pick would conflate turn with fade and contradict itself, so the
+    # how-to-use section falls back to direct flight language.
+    a = Disc(name="Alpha", brand="X", category="Fairway Driver",
+             speed=7, glide=5, turn=-1, fade=2)     # more turn, more fade
+    b = Disc(name="Beta", brand="Y", category="Fairway Driver",
+             speed=7, glide=5, turn=0, fade=1)      # resists turning, gentler
+    v = analysis.compare_verdict([a, b])
+    assert "more movement before the fade" not in v          # no contradictory advice
+    assert "The Alpha has more turn and more fade." in v
+    assert "The Beta resists turning more and finishes more gently." in v
+
+
 def test_verdict_no_fabricated_use_split_when_finish_is_same():
     # Same turn AND fade, differ only in glide -> no invented "reach for X vs Y" split.
     a = Disc(name="Aviar", brand="Innova", category="Putter",

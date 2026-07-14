@@ -142,11 +142,19 @@ def _overlap_text(a, b):
 
 
 def _how_to_use_text(a, b):
-    differ = a.fade != b.fade or roles.stability_number(a) != roles.stability_number(b)
+    stab_a, stab_b = roles.stability_number(a), roles.stability_number(b)
+    differ = a.fade != b.fade or stab_a != stab_b
     if not differ:
         return ("These fly very similarly — reach for whichever you trust; there's "
                 "no meaningful finish difference between them.")
-    # More overstable = higher turn+fade; break ties by fade, then speed.
+    if stab_a == stab_b:
+        # Same overall stability but a different turn/fade split: an over/under
+        # "reach for" pick would conflate turn (movement) with fade (finish) and
+        # contradict itself, so describe the two sides in direct flight language.
+        turny, tame = (a, b) if a.turn < b.turn else (b, a)
+        return (f"The {turny.name} has more turn and more fade. The {tame.name} "
+                "resists turning more and finishes more gently.")
+    # Different stability: more overstable = higher turn+fade.
     key = lambda d: (roles.stability_number(d), d.fade, d.speed)
     over, under = (a, b) if key(a) >= key(b) else (b, a)
     return (f"Reach for the {under.name} when you want easier distance and more "
