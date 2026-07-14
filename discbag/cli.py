@@ -1010,6 +1010,24 @@ def cmd_overlap(args, inv):
     return 0
 
 
+def _ownership_footer(discs):
+    """A light line of real usage/favorite data — only when every compared disc
+    is owned (a database-only disc has no usage). None otherwise."""
+    if any(getattr(d, "user", None) is None for d in discs):
+        return None
+    parts = []
+    for i, d in enumerate(discs):
+        unit = " rounds" if i == 0 else ""
+        parts.append(f"the {d.name} {d.user.round_count}{unit}")
+    line = "You've thrown " + ", ".join(parts) + "."
+    favs = [d.name for d in discs if d.user.favorite]
+    if favs:
+        names = roles.english_list([f"the {n}" for n in favs])
+        verb = "is a favorite" if len(favs) == 1 else "are favorites"
+        line += f" {names[0].upper() + names[1:]} {verb}."
+    return line
+
+
 def cmd_compare(args, inv):
     from discbag import analysis
     db_discs = db.load_db().get("discs", [])
@@ -1021,6 +1039,14 @@ def cmd_compare(args, inv):
             return 1
         discs.append(d)
     print(_render_table(analysis.compare(discs)))
+    verdict = analysis.compare_verdict(discs)
+    if verdict:
+        print()
+        print(verdict)
+    footer = _ownership_footer(discs)
+    if footer:
+        print()
+        print(footer)
     return 0
 
 

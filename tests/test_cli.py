@@ -578,3 +578,42 @@ def test_cmd_edit_identity_change_no_match_warns_on_stderr(tmp_path, capsys, mon
     assert rc == 0
     assert inv.all_discs()[0].mold == "Nonexistent Mold"
     assert "no database match" in capsys.readouterr().err.lower()
+
+
+WAVE = {"name": "Wave", "brand": "MVP", "category": "Distance Driver",
+        "speed": 11, "glide": 5, "turn": -2, "fade": 2, "stability": ""}
+WRAITH = {"name": "Wraith", "brand": "Innova", "category": "Distance Driver",
+          "speed": 11, "glide": 5, "turn": -1, "fade": 3, "stability": ""}
+
+
+def test_cmd_compare_prints_table_verdict_and_footer(tmp_path, capsys, monkeypatch):
+    from discbag import inventory
+    monkeypatch.setattr(cli.db, "load_db", lambda: {"discs": [WAVE, WRAITH]})
+    inv = inventory.Inventory(path=tmp_path / "inventory.json")
+    inv.add(OwnedDisc.from_db_record(WAVE))
+    inv.add(OwnedDisc.from_db_record(WRAITH))
+    for i in range(2):
+        inv.record_use("wave", f"2026-07-0{i+1}T00:00:00+00:00")
+    for i in range(3):
+        inv.record_use("wraith", f"2026-07-0{i+1}T00:00:00+00:00")
+    inv.set_favorite("wave", True)
+    cli.cmd_compare(_ns(discs=["wave", "wraith"]), inv)
+    out = capsys.readouterr().out
+    assert "Stability" in out                       # richer table
+    assert "Bottom line" in out and "Overlap:" in out
+    assert "Key difference:" in out and "How to use them:" in out
+    assert "You've thrown" in out                   # ownership footer
+    # Footer format: only the first disc carries the "rounds" unit (args order).
+    assert "the wave 2 rounds" in out.lower() and "the wraith 3" in out.lower()
+    assert "favorite" in out.lower()                # Wave is a favorite
+
+
+def test_cmd_compare_no_footer_when_a_disc_is_db_only(tmp_path, capsys, monkeypatch):
+    from discbag import inventory
+    monkeypatch.setattr(cli.db, "load_db", lambda: {"discs": [WAVE, WRAITH]})
+    inv = inventory.Inventory(path=tmp_path / "inventory.json")
+    inv.add(OwnedDisc.from_db_record(WAVE))         # only Wave owned; Wraith from DB
+    cli.cmd_compare(_ns(discs=["wave", "wraith"]), inv)
+    out = capsys.readouterr().out
+    assert "Bottom line" in out                     # verdict still shows
+    assert "You've thrown" not in out                # but no ownership footer
