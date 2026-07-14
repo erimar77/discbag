@@ -83,6 +83,8 @@ def compare(discs):
         Row("Glide", [d.glide for d in discs]),
         Row("Turn", [d.turn for d in discs]),
         Row("Fade", [d.fade for d in discs]),
+        Row("Stability",
+            [roles.stability_word(roles.stability_number(d)) for d in discs]),
         Row("Role", [_role_of(d) for d in discs]),
     ]
     return Table(headers=headers, rows=rows)

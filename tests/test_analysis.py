@@ -6,6 +6,10 @@ CHALLENGER = Disc(name="Challenger", brand="Discraft", category="Putter", speed=
 MAKO3 = Disc(name="Mako3", brand="Innova", category="Midrange", speed=5, glide=5, turn=0, fade=0)
 BUZZZ = Disc(name="Buzzz", brand="Discraft", category="Midrange", speed=5, glide=4, turn=-1, fade=1)
 DESTROYER = Disc(name="Destroyer", brand="Innova", category="Distance Driver", speed=12, glide=5, turn=-1, fade=3)
+WAVE = Disc(name="Wave", brand="MVP", category="Distance Driver",
+            speed=11, glide=5, turn=-2, fade=2)
+WRAITH = Disc(name="Wraith", brand="Innova", category="Distance Driver",
+              speed=11, glide=5, turn=-1, fade=3)
 
 
 # ---------- overlap ----------
@@ -41,6 +45,12 @@ def test_compare_includes_expected_role():
     table = analysis.compare([MAKO3])
     role_row = next(r for r in table.rows if r.label == "Role")
     assert role_row.values[0]  # a non-empty role label
+
+
+def test_compare_includes_stability_row():
+    table = analysis.compare([WAVE, WRAITH])
+    stab = next(r for r in table.rows if r.label == "Stability")
+    assert stab.values == ["neutral", "overstable"]   # Wave 0, Wraith 2
 
 
 # ---------- choose ----------
