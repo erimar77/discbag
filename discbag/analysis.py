@@ -11,6 +11,12 @@ from discbag import roles
 # Two discs within this weighted flight-distance are considered redundant.
 OVERLAP_THRESHOLD = 1.6
 
+# For the compare *verdict*: discs within this weighted flight-distance read as
+# "largely duplicate". Stricter than OVERLAP_THRESHOLD (which loosely groups the
+# `overlap` command) so that e.g. Wave vs Wraith reads as "same slot, different",
+# not "duplicate". Tunable.
+NEAR_DUPLICATE_DISTANCE = 1.0
+
 # Flight-distance weights: glide varies a lot but matters least for "same role".
 _W = {"speed": 1.0, "glide": 0.3, "turn": 1.0, "fade": 1.0}
 
@@ -88,6 +94,104 @@ def compare(discs):
         Row("Role", [_role_of(d) for d in discs]),
     ]
     return Table(headers=headers, rows=rows)
+
+
+def _join_and(items):
+    items = list(items)
+    if not items:
+        return ""
+    if len(items) == 1:
+        return items[0]
+    if len(items) == 2:
+        return f"{items[0]} and {items[1]}"
+    return ", ".join(items[:-1]) + f", and {items[-1]}"
+
+
+def _disc_traits(disc, other):
+    """Relative flight traits of `disc` vs `other`, split so sentences read
+    naturally: (noun phrases that follow "has", standalone verb phrases)."""
+    has_nps, verbs = [], []
+    if disc.turn < other.turn:
+        has_nps.append("more high-speed turn")
+    elif disc.turn > other.turn:
+        verbs.append("resists turning more")
+    if disc.fade > other.fade:
+        verbs.append("fades harder")
+    elif disc.fade < other.fade:
+        has_nps.append("a gentler finish")
+    if disc.speed > other.speed:
+        has_nps.append("a higher speed ceiling")
+    elif disc.speed < other.speed:
+        verbs.append("is a touch slower")
+    return has_nps, verbs
+
+
+def _trait_sentence(disc, other):
+    has_nps, verbs = _disc_traits(disc, other)
+    parts = []
+    if has_nps:
+        parts.append("has " + _join_and(has_nps))
+    parts.extend(verbs)
+    if not parts:
+        return f"The {disc.name} flies almost identically."
+    return f"The {disc.name} " + _join_and(parts) + "."
+
+
+def _overlap_text(a, b):
+    dist = _flight_distance(a, b)
+    role_a = roles.primary_role(a).name
+    role_b = roles.primary_role(b).name
+    same_role = role_a == role_b
+    if dist <= NEAR_DUPLICATE_DISTANCE:
+        where = f" in the {role_a.lower()} slot" if same_role else ""
+        return f"These fly very similarly and largely duplicate each other{where}."
+    if same_role:
+        return (f"These occupy the same broad {role_a.lower()} slot, but their "
+                "flights are meaningfully different.")
+    return (f"These fill different roles — {role_a} vs {role_b} — and "
+            "complement each other.")
+
+
+def _how_to_use_text(a, b):
+    # More overstable = higher turn+fade; break ties by fade, then speed.
+    key = lambda d: (roles.stability_number(d), d.fade, d.speed)
+    over, under = (a, b) if key(a) >= key(b) else (b, a)
+    text = (f"Reach for the {under.name} when you want easier distance and more "
+            f"movement before the fade. Reach for the {over.name} when you want a "
+            f"stronger finish or more resistance to wind.")
+    if a.fade != b.fade or roles.stability_number(a) != roles.stability_number(b):
+        text += (f" Expect the {over.name} to finish left more strongly than the "
+                 f"{under.name}. That difference is built into the discs, although "
+                 "an unusually early fade can still reflect the throw.")
+    return text
+
+
+def _degraded_note(discs):
+    idx = range(len(discs))
+    pairs = [(i, j) for i in idx for j in idx if i < j]
+    ci, cj = min(pairs, key=lambda p: _flight_distance(discs[p[0]], discs[p[1]]))
+    dist_total = lambda i: sum(_flight_distance(discs[i], discs[j])
+                               for j in idx if j != i)
+    di = max(idx, key=dist_total)
+    return (f"Most similar: {discs[ci].name} and {discs[cj].name}. "
+            f"Most distinct: {discs[di].name}.")
+
+
+def compare_verdict(discs):
+    """A rule-derived bottom line. Three-part relative verdict for exactly two
+    discs; a one-line degraded note for 3+; None for fewer than two."""
+    if len(discs) < 2:
+        return None
+    if len(discs) > 2:
+        return _degraded_note(discs)
+    a, b = discs
+    key_diff = _trait_sentence(a, b) + " " + _trait_sentence(b, a)
+    return (
+        "Bottom line\n\n"
+        f"Overlap:\n{_overlap_text(a, b)}\n\n"
+        f"Key difference:\n{key_diff}\n\n"
+        f"How to use them:\n{_how_to_use_text(a, b)}"
+    )
 
 
 # ---------- choose ----------
