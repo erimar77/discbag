@@ -613,9 +613,47 @@ def test_cmd_compare_prints_table_verdict_and_footer(tmp_path, capsys, monkeypat
     assert "Bottom line" in out and "Overlap:" in out
     assert "Key difference:" in out and "How to use them:" in out
     assert "You've thrown" in out                   # ownership footer
-    # Footer format: only the first disc carries the "rounds" unit (args order).
-    assert "the wave 2 rounds" in out.lower() and "the wraith 3" in out.lower()
+    # Footer names rounds for each disc, with the unit on each.
+    assert "the wave 2 rounds" in out.lower() and "the wraith 3 rounds" in out.lower()
     assert "favorite" in out.lower()                # Wave is a favorite
+
+
+def test_cmd_compare_no_footer_when_no_rounds_thrown(tmp_path, capsys, monkeypatch):
+    from discbag import inventory
+    monkeypatch.setattr(cli.db, "load_db", lambda: {"discs": [WAVE, WRAITH]})
+    inv = inventory.Inventory(path=tmp_path / "inventory.json")
+    inv.add(OwnedDisc.from_db_record(WAVE))
+    inv.add(OwnedDisc.from_db_record(WRAITH))        # both owned, zero rounds thrown
+    cli.cmd_compare(_ns(discs=["wave", "wraith"]), inv)
+    out = capsys.readouterr().out
+    assert "Bottom line" in out                      # verdict still shows
+    assert "You've thrown" not in out                # but no footer with zero rounds
+
+
+def test_cmd_compare_single_disc_has_no_footer(tmp_path, capsys, monkeypatch):
+    from discbag import inventory
+    monkeypatch.setattr(cli.db, "load_db", lambda: {"discs": [WAVE]})
+    inv = inventory.Inventory(path=tmp_path / "inventory.json")
+    inv.add(OwnedDisc.from_db_record(WAVE))
+    inv.record_use("wave", "2026-07-01T00:00:00+00:00")
+    cli.cmd_compare(_ns(discs=["wave"]), inv)
+    out = capsys.readouterr().out
+    assert "You've thrown" not in out                # no footer for a 1-disc compare
+
+
+def test_cmd_compare_footer_uses_singular_and_plural_rounds(tmp_path, capsys, monkeypatch):
+    from discbag import inventory
+    monkeypatch.setattr(cli.db, "load_db", lambda: {"discs": [WAVE, WRAITH]})
+    inv = inventory.Inventory(path=tmp_path / "inventory.json")
+    inv.add(OwnedDisc.from_db_record(WAVE))
+    inv.add(OwnedDisc.from_db_record(WRAITH))
+    inv.record_use("wave", "2026-07-01T00:00:00+00:00")              # 1 round  -> singular
+    for i in range(2):
+        inv.record_use("wraith", f"2026-07-0{i+1}T00:00:00+00:00")   # 2 rounds -> plural
+    cli.cmd_compare(_ns(discs=["wave", "wraith"]), inv)
+    out = capsys.readouterr().out.lower()
+    assert "the wave 1 round" in out and "1 rounds" not in out       # singular grammar
+    assert "the wraith 2 rounds" in out
 
 
 def test_cmd_compare_no_footer_when_a_disc_is_db_only(tmp_path, capsys, monkeypatch):

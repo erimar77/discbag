@@ -1011,15 +1011,21 @@ def cmd_overlap(args, inv):
 
 
 def _ownership_footer(discs):
-    """A light line of real usage/favorite data — only when every compared disc
-    is owned (a database-only disc has no usage). None otherwise."""
+    """A light line of real usage/favorite data — only for a genuine multi-disc
+    comparison where every disc is owned and at least one has rounds thrown. A
+    database-only disc has no usage; a disc with zero rounds has nothing to report."""
+    if len(discs) < 2:
+        return None
     if any(getattr(d, "user", None) is None for d in discs):
         return None
-    parts = []
-    for i, d in enumerate(discs):
-        unit = " rounds" if i == 0 else ""
-        parts.append(f"the {d.name} {d.user.round_count}{unit}")
-    line = "You've thrown " + ", ".join(parts) + "."
+    if not any(d.user.round_count > 0 for d in discs):
+        return None
+
+    def rounds(n):
+        return f"{n} round" if n == 1 else f"{n} rounds"
+
+    parts = [f"the {d.name} {rounds(d.user.round_count)}" for d in discs]
+    line = "You've thrown " + roles.english_list(parts) + "."
     favs = [d.name for d in discs if d.user.favorite]
     if favs:
         names = roles.english_list([f"the {n}" for n in favs])
