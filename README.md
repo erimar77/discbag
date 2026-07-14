@@ -385,8 +385,8 @@ discbag chart [--type flight|grid|stability|speed|composition|brands]
 adds a derived **Stability** row, and — when you compare exactly two discs — a plain
 bottom line: how much the two overlap, their key difference (in relative terms), and
 when to reach for each. If both discs are in your bag, it closes with how many rounds
-you've thrown each. Comparing three or more discs shows the table plus a short note on
-the most similar and most distinct.
+you've thrown each and which are favorites. Comparing three or more discs shows the
+table plus a short note on the most similar and most distinct.
 
     discbag compare wave wraith
 

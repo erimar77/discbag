@@ -117,13 +117,13 @@ def _disc_traits(disc, other):
 
 def _trait_sentence(disc, other):
     has_nps, verbs = _disc_traits(disc, other)
-    parts = []
-    if has_nps:
-        parts.append("has " + roles.english_list(has_nps))
-    parts.extend(verbs)
-    if not parts:
+    if not has_nps and not verbs:
         return f"The {disc.name} flies almost identically."
-    return f"The {disc.name} " + roles.english_list(parts) + "."
+    if has_nps and verbs:
+        return (f"The {disc.name} has {roles.english_list(has_nps)}; it also "
+                f"{roles.english_list(verbs)}.")
+    clauses = (["has " + roles.english_list(has_nps)] if has_nps else []) + verbs
+    return f"The {disc.name} {roles.english_list(clauses)}."
 
 
 def _overlap_text(a, b):

@@ -104,6 +104,17 @@ def test_verdict_key_difference_matches_target_wording():
     assert "The Wraith resists turning more and fades harder." in v
 
 
+def test_verdict_key_difference_no_awkward_double_and():
+    # Disc that differs on all three axes as two "has" phrases + one verb phrase.
+    a = Disc(name="Alpha", brand="X", category="Distance Driver",
+             speed=12, glide=5, turn=-3, fade=3)
+    b = Disc(name="Bravo", brand="Y", category="Distance Driver",
+             speed=9, glide=4, turn=-1, fade=1)
+    v = analysis.compare_verdict([a, b])
+    assert "ceiling and fades harder" not in v      # the awkward chain is gone
+    assert "; it also fades harder" in v
+
+
 def test_verdict_uses_relative_not_absolute_stability():
     v = analysis.compare_verdict([WAVE, WRAITH])
     # No absolute "is overstable"/"is understable" declaration in the verdict.
