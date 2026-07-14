@@ -125,6 +125,18 @@ def test_verdict_how_to_use_has_softened_fade_caveat():
     assert "Expect the Wraith to finish left more strongly than the Wave" in v
 
 
+def test_verdict_no_fabricated_use_split_when_finish_is_same():
+    # Same turn AND fade, differ only in glide -> no invented "reach for X vs Y" split.
+    a = Disc(name="Aviar", brand="Innova", category="Putter",
+             speed=2, glide=3, turn=0, fade=2)
+    b = Disc(name="Wizard", brand="Gateway", category="Putter",
+             speed=2, glide=5, turn=0, fade=2)
+    v = analysis.compare_verdict([a, b])
+    assert "Reach for" not in v
+    assert "can still reflect the throw" not in v          # no caveat
+    assert "no meaningful finish difference" in v
+
+
 def test_verdict_three_plus_is_degraded_note():
     third = Disc(name="Firebird", brand="Innova", category="Distance Driver",
                  speed=9, glide=3, turn=0, fade=4)

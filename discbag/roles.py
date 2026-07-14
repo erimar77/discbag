@@ -302,7 +302,7 @@ def best_next(bag, catalog, n=3, profile=None, preferred_only=False):
 
     base = target.priority_reason or target.role.missing_reason
     if covered:
-        reason = f"Your bag already covers {_english_list(covered)}. {base}"
+        reason = f"Your bag already covers {english_list(covered)}. {base}"
     else:
         reason = base
     return NextPurchase(coverage=target, candidates=candidates, reason=reason)
@@ -319,7 +319,7 @@ def roles_for_situation(situation):
     return [order[name] for name in names if name in order]
 
 
-def _english_list(items):
+def english_list(items):
     items = list(items)
     if len(items) <= 1:
         return items[0] if items else ""

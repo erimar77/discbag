@@ -96,17 +96,6 @@ def compare(discs):
     return Table(headers=headers, rows=rows)
 
 
-def _join_and(items):
-    items = list(items)
-    if not items:
-        return ""
-    if len(items) == 1:
-        return items[0]
-    if len(items) == 2:
-        return f"{items[0]} and {items[1]}"
-    return ", ".join(items[:-1]) + f", and {items[-1]}"
-
-
 def _disc_traits(disc, other):
     """Relative flight traits of `disc` vs `other`, split so sentences read
     naturally: (noun phrases that follow "has", standalone verb phrases)."""
@@ -130,11 +119,11 @@ def _trait_sentence(disc, other):
     has_nps, verbs = _disc_traits(disc, other)
     parts = []
     if has_nps:
-        parts.append("has " + _join_and(has_nps))
+        parts.append("has " + roles.english_list(has_nps))
     parts.extend(verbs)
     if not parts:
         return f"The {disc.name} flies almost identically."
-    return f"The {disc.name} " + _join_and(parts) + "."
+    return f"The {disc.name} " + roles.english_list(parts) + "."
 
 
 def _overlap_text(a, b):
@@ -153,17 +142,19 @@ def _overlap_text(a, b):
 
 
 def _how_to_use_text(a, b):
+    differ = a.fade != b.fade or roles.stability_number(a) != roles.stability_number(b)
+    if not differ:
+        return ("These fly very similarly — reach for whichever you trust; there's "
+                "no meaningful finish difference between them.")
     # More overstable = higher turn+fade; break ties by fade, then speed.
     key = lambda d: (roles.stability_number(d), d.fade, d.speed)
     over, under = (a, b) if key(a) >= key(b) else (b, a)
-    text = (f"Reach for the {under.name} when you want easier distance and more "
+    return (f"Reach for the {under.name} when you want easier distance and more "
             f"movement before the fade. Reach for the {over.name} when you want a "
-            f"stronger finish or more resistance to wind.")
-    if a.fade != b.fade or roles.stability_number(a) != roles.stability_number(b):
-        text += (f" Expect the {over.name} to finish left more strongly than the "
-                 f"{under.name}. That difference is built into the discs, although "
-                 "an unusually early fade can still reflect the throw.")
-    return text
+            f"stronger finish or more resistance to wind. Expect the {over.name} to "
+            f"finish left more strongly than the {under.name}. That difference is "
+            "built into the discs, although an unusually early fade can still "
+            "reflect the throw.")
 
 
 def _degraded_note(discs):
