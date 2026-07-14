@@ -7,6 +7,9 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- `discbag compare` now adds a derived Stability row and, for two discs, a
+  rule-derived bottom line (overlap, key difference in relative terms, and how to
+  use each), plus an ownership footer when both discs are in your bag.
 - `discbag edit` corrects a disc's inventory metadata (plastic, weight, color, condition,
   notes, manufacturer, mold) in place, without creating a history event. Changing the
   manufacturer/mold refreshes cached flight numbers from the database.

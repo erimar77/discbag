@@ -381,6 +381,15 @@ discbag practice                    # form-focused practice discs
 discbag chart [--type flight|grid|stability|speed|composition|brands]
 ```
 
+`compare` now shows more than the raw numbers. Alongside speed/glide/turn/fade it
+adds a derived **Stability** row, and — when you compare exactly two discs — a plain
+bottom line: how much the two overlap, their key difference (in relative terms), and
+when to reach for each. If both discs are in your bag, it closes with how many rounds
+you've thrown each. Comparing three or more discs shows the table plus a short note on
+the most similar and most distinct.
+
+    discbag compare wave wraith
+
 ### Data
 ```bash
 discbag updatedb                    # refresh the disc database from the source
