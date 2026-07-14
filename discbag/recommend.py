@@ -64,7 +64,7 @@ class BagResult:
 
 
 def _stability(disc):
-    return float(disc.turn) + float(disc.fade)
+    return roles.stability_number(disc)
 
 
 def _overpower(disc, profile):

@@ -3,6 +3,7 @@
 from collections import Counter
 
 from discbag import braille
+from discbag import roles
 
 # Speed bands, top (fastest) to bottom (slowest).
 _BANDS = [
@@ -18,7 +19,7 @@ _STAB_MIN, _STAB_MAX = -5, 5
 
 def stability(disc):
     """A single overall-stability number: turn + fade (negative = understable)."""
-    return float(disc.turn) + float(disc.fade)
+    return roles.stability_number(disc)
 
 
 def _col(stab):

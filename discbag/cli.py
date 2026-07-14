@@ -4,7 +4,7 @@ import argparse
 import sys
 from datetime import datetime, timezone
 
-from discbag import db, history, player
+from discbag import db, history, player, roles
 from discbag.inventory import Disc, Inventory, OwnedDisc
 
 
@@ -74,18 +74,6 @@ def _print_disc_row(disc):
     print(f"      {flight_str(disc)}   {disc.category}  ({disc.stability}){role}{tags}".rstrip())
 
 
-def _stability_word(stab):
-    if stab <= -2:
-        return "very understable"
-    if stab <= -0.5:
-        return "understable"
-    if stab < 1.5:
-        return "neutral"
-    if stab < 3:
-        return "overstable"
-    return "very overstable"
-
-
 def format_owned(disc, profile=None):
     """Render an owned disc: manufacturer facts plus this physical disc's user data."""
     plastic = f" [{disc.plastic}]" if disc.plastic else ""
@@ -134,7 +122,7 @@ def format_owned(disc, profile=None):
     if profile is not None and not profile.is_empty():
         from discbag import roles
         f = roles.behaves_flight(disc, profile)
-        word = _stability_word(f.turn + f.fade)
+        word = roles.stability_word(f.turn + f.fade)
         nums = " / ".join(_num_str(round(v, 1)) for v in (f.speed, f.glide, f.turn, f.fade))
         lines.append(f"  For you:   plays {word}  ({nums})")
 

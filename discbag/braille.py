@@ -4,6 +4,8 @@ Each character cell packs a 2-wide by 4-tall grid of dots using the Unicode
 Braille Patterns block (U+2800-U+28FF), giving 8x the resolution of one glyph.
 """
 
+from discbag import roles
+
 # Braille dot bit for each (x in 0..1, y in 0..3) position within a cell.
 _DOT_BITS = {
     (0, 0): 0x01, (0, 1): 0x02, (0, 2): 0x04, (0, 3): 0x40,
@@ -41,7 +43,7 @@ _SPEED_MIN, _SPEED_MAX = 1.0, 14.0
 
 
 def _stability(disc):
-    return float(disc.turn) + float(disc.fade)
+    return roles.stability_number(disc)
 
 
 def flight_scatter(discs, width=60, height=32):

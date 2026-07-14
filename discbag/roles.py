@@ -18,6 +18,25 @@ from dataclasses import dataclass
 
 from discbag import player
 
+
+def stability_number(disc):
+    """A single overall-stability number: turn + fade (negative = understable)."""
+    return float(disc.turn) + float(disc.fade)
+
+
+def stability_word(stab):
+    """Map a stability number to a broad category word."""
+    if stab <= -2:
+        return "very understable"
+    if stab <= -0.5:
+        return "understable"
+    if stab < 1.5:
+        return "neutral"
+    if stab < 3:
+        return "overstable"
+    return "very overstable"
+
+
 INF = math.inf
 
 Flight = namedtuple("Flight", ["speed", "glide", "turn", "fade"])

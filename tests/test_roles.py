@@ -161,3 +161,21 @@ def test_windy_situation_includes_overstable_roles():
 
 def test_minimal_situation_is_smaller_than_full():
     assert len(roles.roles_for_situation("minimal")) < len(roles.ROLES)
+
+
+# ---------- stability helpers ----------
+
+def test_stability_number_is_turn_plus_fade():
+    from discbag import roles
+    from discbag.inventory import Disc
+    d = Disc(name="X", speed=11, glide=5, turn=-2, fade=3)
+    assert roles.stability_number(d) == 1.0
+
+
+def test_stability_word_thresholds():
+    from discbag import roles
+    assert roles.stability_word(-2) == "very understable"
+    assert roles.stability_word(-1) == "understable"
+    assert roles.stability_word(0) == "neutral"
+    assert roles.stability_word(2) == "overstable"
+    assert roles.stability_word(3) == "very overstable"
