@@ -267,12 +267,12 @@ from a beat one, so it earns its own story.
 
 `edit` fixes or fills in a disc's metadata after adding it — including a typo in the manufacturer or
 mold, which re-derives the cached flight numbers from the database. Because it's a **correction, not
-an event**, it never touches the disc's history. When a name matches more than one copy you're asked
-which; `list --ids` plus `edit --id` targets one directly for scripting. `history` shows a summary
-followed by the persisted event timeline:
+an event**, it never touches the disc's history.
+
+`history` shows a summary followed by the persisted event timeline. For a disc you played a few
+times and later sold, it reads like this (illustrative):
 
 ```text
-$ discbag history leopard
 Innova Leopard
   Status: Sold
   ...
@@ -285,12 +285,12 @@ History
   2026-06-20  Sold (traded to a friend)
 ```
 
-**Two of the same mold are two different discs.** Each copy gets a permanent internal id and keeps
-its own wear, history, and personal flight, so two Roadrunners can legitimately earn different advice.
-You rarely see the id — single-disc commands just ask which copy you mean, using whatever tells them
-apart (plastic, weight, color, condition, date). When there's no terminal to ask, an ambiguous name is
-a hard error, never a guess. The bulk-friendly commands (`tag`, `untag`, `favorite`, `sync`) take
-`--all` to act on every copy at once.
+**Two of the same mold are two different discs.** Each copy keeps its own wear, history, and personal
+flight, so two Roadrunners can legitimately earn different advice. You rarely think about the id
+behind them — single-disc commands just ask which copy you mean, using whatever tells them apart
+(plastic, weight, color). For scripting, `list --ids` reveals those ids and `edit --id` targets one
+directly. And the bulk-friendly commands (`tag`, `untag`, `favorite`, `sync`) take `--all` to act on
+every copy at once.
 
 ### Analysis
 
@@ -326,10 +326,9 @@ Discraft Buzzz
 This signal feeds the build-bag goals: `confidence` and `tournament` favor discs you use often and
 recently, `development` nudges toward under-used discs, and `fun` revisits ones you've neglected.
 
-`flight` records how a disc actually flies **for you** — those numbers then override the model in
-every recommendation (`--clear` removes them). `compare` shows speed/glide/turn/fade plus a derived
-**Stability** and **Role** row; for exactly two discs it adds a plain-language bottom line, and if
-both are in your bag, how many rounds you've thrown each:
+`flight` records how a disc actually flies **for you** (`--clear` removes it). `compare` shows
+speed/glide/turn/fade plus a derived **Stability** and **Role** row; for exactly two discs it adds a
+plain-language bottom line, and if both are in your bag, how many rounds you've thrown each:
 
 ```text
 $ discbag compare wave wraith
