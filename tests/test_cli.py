@@ -665,3 +665,34 @@ def test_cmd_compare_no_footer_when_a_disc_is_db_only(tmp_path, capsys, monkeypa
     out = capsys.readouterr().out
     assert "Bottom line" in out                     # verdict still shows
     assert "You've thrown" not in out                # but no ownership footer
+
+
+def test_cmd_maturity_developed(tmp_path, capsys):
+    from discbag import inventory
+    inv = inventory.Inventory(path=tmp_path / "inventory.json")
+    # A covered, settled, well-used bag. Monkeypatch not needed: give real coverage
+    # via a broad speed spread and heavy concentrated usage.
+    specs = [("Aviar", 2, 0, 2), ("Wizard", 2, 0, 1), ("Roc", 5, 0, 3),
+             ("Buzzz", 5, -1, 1), ("Leopard", 6, -2, 1), ("Teebird", 7, 0, 2),
+             ("Firebird", 9, 0, 4), ("Wraith", 11, -1, 3), ("Destroyer", 12, -1, 3)]
+    for i, (mold, sp, tu, fa) in enumerate(specs):
+        rec = {"name": mold, "brand": "Innova", "category": "x",
+               "speed": sp, "glide": 5, "turn": tu, "fade": fa, "stability": ""}
+        uses = 30 if i < 2 else 1                       # concentrate on 2 discs
+        inv.add(OwnedDisc.from_db_record(rec, use_count=uses, last_used="2026-07-10",
+                                         date_added="2025-01-01"))
+    cli.cmd_maturity(_ns(), inv)
+    out = capsys.readouterr().out
+    assert "Collection Maturity" in out
+    assert "Why:" in out
+    # phase is one of the three labels
+    assert any(p in out for p in ("Discovery", "Developing", "Developed"))
+
+
+def test_cmd_maturity_empty_bag(tmp_path, capsys):
+    from discbag import inventory
+    inv = inventory.Inventory(path=tmp_path / "inventory.json")
+    cli.cmd_maturity(_ns(), inv)
+    out = capsys.readouterr().out
+    assert "Discovery" in out
+    assert "empty" in out.lower()

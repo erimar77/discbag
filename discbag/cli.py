@@ -1010,6 +1010,51 @@ def cmd_overlap(args, inv):
     return 0
 
 
+def cmd_maturity(args, inv):
+    """Where your collection sits today — Discovery, Developing, or Developed — and
+    why, with grounded usage insights and observed preferences. Coaching, not a
+    recommendation: it answers 'do I actually need anything?'"""
+    from discbag import maturity
+    prof = player.load_profile()
+    profile = None if prof.is_empty() else prof
+    today = datetime.now(timezone.utc).date()
+    active = inv.list_discs()
+    all_discs = inv.all_discs()
+
+    phase, signals = maturity.assess_phase(active, all_discs, profile, today)
+    insights = maturity.usage_insights(active, today)
+    prefs = maturity.observed_preferences(active)
+
+    color = _use_color()
+    st = _styler(color)
+    hue = {"Discovery": "yellow", "Developing": "cyan", "Developed": "green"}.get(phase, "cyan")
+
+    print(st("Collection Maturity", "bold"))
+    print(f"  {st(phase, 'bold', hue)}\n")
+    print(st("Why:", "bold"))
+    for s in signals:
+        mark = st("✓", "green") if s.met else st("•", "dim")
+        print(f"  {mark} {s.text}")
+
+    tail = {
+        "Discovery": "Keep exploring — every new disc still teaches you something.",
+        "Developing": "You're close — more reps will tell you which discs you truly trust.",
+        "Developed": ("Another disc is unlikely to improve your game right now.\n"
+                      "Your biggest gains will come from throwing the discs you already own."),
+    }[phase]
+    print("\n" + tail)
+
+    if insights:
+        print("\n" + st("Usage insights", "bold"))
+        for line in insights:
+            print(f"  {line}")
+    if prefs:
+        print("\n" + st("Observed preferences", "bold"))
+        for line in prefs:
+            print(f"  {line}")
+    return 0
+
+
 def _ownership_footer(discs):
     """A light line of real usage/favorite data — only for a genuine multi-disc
     comparison where every disc is owned and at least one has rounds thrown. A
@@ -1408,6 +1453,7 @@ _HELP_GROUPS = [
         ("compare", "side-by-side flight/role table"),
         ("chart", "terminal flight visualizations"),
         ("flight", "record how a disc flies for you"),
+        ("maturity", "is your collection still growing, or settled?"),
     ]),
     ("Advanced", [
         ("explain", "why the engine chose what it did"),
@@ -1694,6 +1740,9 @@ def build_parser():
                           help="how sure you are, 1-5")
     p_flight.add_argument("--clear", action="store_true", help="remove personal flight numbers")
     p_flight.set_defaults(func=cmd_flight)
+
+    sub.add_parser("maturity",
+                   help="where your collection sits today, and why").set_defaults(func=cmd_maturity)
 
     return parser
 
