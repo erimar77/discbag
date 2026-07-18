@@ -56,36 +56,40 @@ player, with no change to this feature.
 
 ### Step 2: behavior (only once the gate is passed)
 
-If there are no meaningful gaps, examine settledness signals (each a boolean with a plain reason):
+With coverage in place, maturity turns on whether the collection actually **supports the player's
+game** — proven by how they throw, not by whether they've resisted curiosity. Two signals are
+**required** for `Developed`; the rest are **supporting** context that enriches the "why" but never
+flips the phase.
 
-1. **Consistent, real usage** — enough recorded throws to judge (`total recorded uses ≥ MIN_USES`)
-   **and** thrown recently (`last activity within ACTIVE_WINDOW`). This is the data-sufficiency
-   gate: without it we can't claim "settled," so the phase can be at most `Developing`.
-2. **Settled core** — a small handful of discs accounts for most throws: the fewest active discs
-   whose combined `use_count` reaches `CONCENTRATION` of all recorded uses is at most
-   `CORE_FRACTION` of the active bag.
-3. **Not chasing new molds — refining, not exploring.** The behavior that signals immaturity is
-   still *searching for what works* — bringing in genuinely **new molds** — not simply buying
-   something similar to what you own. Count the distinct molds whose **first** acquisition
-   (earliest `date_added` across all your copies of that mold, active or archived) falls within
-   `RECENT_WINDOW`; the signal is met when that count is at most `MAX_RECENT_NEW_MOLDS`.
+**Required** (both must hold for `Developed`):
 
-   Crucially, another copy of a mold you **already own** introduces no new mold, so it never counts
-   against you: a backup of a favorite, a same-mold replacement (what `replace` produces), another
-   plastic or weight, cycling a fresh Roc or Wizard. Those are refinement — the mark of a settled
-   player who knows what they like — not exploration. No recent acquisitions at all also counts as
-   met.
+1. **Sufficient, real usage** — enough recorded throws to judge (`total recorded uses ≥ MIN_USES`)
+   **and** thrown recently (`last activity within ACTIVE_WINDOW`). Without it we can't claim
+   anything is settled, so the phase is at most `Developing`.
+2. **Demonstrably settled usage** — a small core carries most throws: the fewest active discs whose
+   combined `use_count` reaches `CONCENTRATION` of all recorded uses is at most `CORE_FRACTION` of
+   the active bag. This is the real test of "the player has found what works."
 
-**Established favorites** (`favorites ≥ MIN_FAVORITES`) is shown as a **supporting** signal in the
-"why" list but is **not required** for `Developed` — marking favorites is a manual action, and its
-absence doesn't prove a player is unsettled.
+**Supporting** (shown in the "why" for context; they color the picture but never change the phase):
+
+- **Not chasing new molds** — distinct molds whose **first** acquisition (earliest `date_added`
+  across all copies of that mold, active or archived) falls within `RECENT_WINDOW`, counted against
+  `MAX_RECENT_NEW_MOLDS`. A backup, same-mold `replace`, plastic/weight variant, cycling a fresh
+  Roc, or rebuying a mold you once owned introduces **no** new mold and never counts. When a mature
+  player *does* add a new mold or two out of curiosity, this surfaces as a `•` note ("a little
+  experimenting") — it does **not** demote them, because their settled usage already proves the
+  collection supports their game. And there's a natural backstop: if new molds ever genuinely take
+  over their throwing, the required *settled usage* signal drops on its own.
+- **Established favorites** — `favorites ≥ MIN_FAVORITES`. Marking favorites is a manual action; its
+  absence proves nothing, so it only ever supports.
 
 **Phase resolution:**
-- **`Developed`** — no meaningful gaps **and** all three behavioral signals (1, 2, 3) met.
-  Message: *"Another disc is unlikely to improve your game right now — your gains are in reps."*
-- **`Developing`** — no meaningful gaps, but at least one behavioral signal is unmet (throws still
-  spread out, still bringing in new molds, or **not enough usage history to judge**). A
-  freshly-stocked full-coverage bag with no rounds logged lands here, never `Developed`.
+- **`Developed`** — no meaningful gaps **and** both required signals (sufficient usage, settled
+  usage) met. Message: *"Another disc is unlikely to improve your game right now — your gains are in
+  reps."*
+- **`Developing`** — no meaningful gaps, but usage is still spread across the bag, or there's not
+  enough usage history to judge. A freshly-stocked full-coverage bag with no rounds logged lands
+  here, never `Developed`.
 
 Phase labels are **Discovery → Developing → Developed** (a three-state refinement of the proposal's
 Discovery/Development framing, produced naturally by the gate + behavior split).
@@ -107,8 +111,9 @@ Your biggest gains will come from throwing the discs you already own.
 ```
 
 A `Discovery` example leads with the gaps and an encouraging note ("every new disc still teaches
-you something — keep exploring"); a `Developing` example shows which behavioral signal is `•`
-not-yet and what would move it.
+you something — keep exploring"); a `Developing` example shows which **required** signal is `•`
+not-yet and what would move it. A mature player who's recently bought a new mold or two still reads
+`Developed`, with a supporting `•` line noting the experimenting rather than a demotion.
 
 ## Usage insights
 
@@ -155,7 +160,7 @@ Written as named module constants so they can be tuned without touching logic:
 | `CONCENTRATION` | 0.80 | Share of throws that a "core" must cover. |
 | `CORE_FRACTION` | 1/3 | Max size of that core, as a fraction of the active bag. |
 | `RECENT_WINDOW` | 180 days | Window for a "recently introduced" new mold. |
-| `MAX_RECENT_NEW_MOLDS` | 1 | New molds first acquired within `RECENT_WINDOW` allowed while still "settled" (backups/replacements/plastic/weight variants of owned molds never count). |
+| `MAX_RECENT_NEW_MOLDS` | 1 | New molds first acquired within `RECENT_WINDOW` before the supporting "not chasing new molds" note flips from refinement to "experimenting" (backups/replacements/plastic/weight variants of owned molds never count). Supporting only — never gates the phase. |
 | `MIN_FAVORITES` | 3 | Threshold for the supporting "established favorites" signal. |
 | `NEGLECT_DAYS` | 180 | Age past which an unused in-bag disc is "neglected". |
 | `DOMINANT_SHARE` | 0.50 | Category-usage share that makes a disc the clear primary. |
@@ -185,14 +190,16 @@ Reuses: `roles.assess`, `roles.stability_number`/`stability_word`, `analysis.ove
 
 - **Gate:** a meaningful (High/Medium, non-optional) missing role → `Discovery`; a missing *Low*
   role or an optional role does **not** force Discovery; empty/tiny bag → `Discovery`.
-- **Behavior:** full coverage + all three behavioral signals → `Developed`; full coverage but
-  spread-out usage, or a recent new mold beyond `MAX_RECENT_NEW_MOLDS`, or usage below `MIN_USES`
-  → `Developing`.
-- **Refinement is not exploration:** a settled `Developed` bag stays `Developed` after buying a
-  backup of an owned mold, a same-mold `replace`, or another plastic/weight of a mold it owns
-  (no new mold introduced). Rebuying a mold you previously owned and archived also counts as
-  refinement, not a new mold. Adding a genuinely new mold beyond the threshold does move it to
+- **Required signals gate the phase:** full coverage + sufficient usage + settled core →
+  `Developed`; full coverage but usage spread across the bag, or usage below `MIN_USES` →
   `Developing`.
+- **New molds are supporting, not required:** a settled `Developed` bag stays `Developed` after
+  adding one or more genuinely **new** molds (they surface only as a supporting `•` note), as long
+  as its usage stays concentrated. Buying a backup, a same-mold `replace`, a plastic/weight variant,
+  or rebuying a previously-owned/archived mold introduces no new mold at all.
+- **Settled usage is the real backstop:** if new molds actually take over throwing (concentration
+  drops below `CONCENTRATION`), the required settled-usage signal fails and the phase falls to
+  `Developing` on its own — no separate new-mold gate needed.
 - **Favorites are supporting, not required:** a settled bag with zero favorites still reaches
   `Developed`.
 - **Usage insights:** each insight fires at its threshold and is absent below it; the render cap is
