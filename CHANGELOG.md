@@ -103,6 +103,17 @@ All notable changes to this project are documented here. The format is based on
   Practices with the last of each. `use_count` still increments for both — only the context
   differs. Legacy string entries count as rounds; no migration required.
 
+### Fixed
+- `restore` now returns a disc to your carry bag, not just active inventory.
+- `bag add`/`bag remove` act on a single copy (with `--all` for every copy of a mold),
+  matching the rest of the CLI.
+- `choose` and `practice` now read your carry bag; planning commands still use your
+  full inventory.
+- Rejected invalid `--date` values and non-positive `--count`/`--size`/`--per-slot`.
+- `build-bag --size` distinguishes genuine coverage gaps from roles left out to fit the size.
+- `history` shows a disc's current damaged state.
+- Removed the no-op `score --situation` and its always-zero "Scenario adjustment" line.
+
 ## [0.1.0] - 2026-07-02
 
 Initial release — a command-line disc golf bag intelligence engine.

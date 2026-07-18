@@ -245,7 +245,7 @@ discbag remove <name> [--status retired|lost|sold|gifted|broken] [--reason "..."
 discbag lost <name> [--reason "..."]                        # archive as lost
 discbag damaged <name> [--reason "..."] [--retire | --unset] # flag (kept in bag), archive, or clear
 discbag replace <name> [--status <s>] [--reason "..."] [--plastic --weight --color]
-discbag restore <name>              # bring an archived disc back to the bag
+discbag restore <name>              # bring an archived disc back into your bag
 discbag delete <name> [--yes]       # permanently erase a disc and its history (confirms first)
 discbag history <name>              # a disc's full story, even after it leaves your bag
 discbag favorite <disc> [--unset] [--all]
@@ -258,7 +258,7 @@ discbag edit <name> [--plastic --weight --color --condition --notes --manufactur
 **A disc's life is tracked, not erased.** Every disc has a lifecycle status — `active`, or an
 archived state (`retired`, `lost`, `sold`, `gifted`, `broken`) with an optional reason. `lost`,
 `sold`, and friends archive a disc out of your active inventory but keep its history; `restore`
-brings one back; only `delete` truly erases, and it asks first.
+brings one back into your bag, ready to carry again; only `delete` truly erases, and it asks first.
 
 `damaged` is subtler, because a beat-in disc is often still in play: it flags the disc but **keeps it
 in your bag** and in every recommendation, just visibly marked. When it's finally worn out,
@@ -289,10 +289,11 @@ History
 
 **Two of the same mold are two different discs.** Each copy keeps its own wear, history, and personal
 flight, so two Roadrunners can legitimately earn different advice. You rarely think about the id
-behind them — single-disc commands just ask which copy you mean, using whatever tells them apart
-(plastic, weight, color). For scripting, `list --ids` reveals those ids and `edit --id` targets one
-directly. And the bulk-friendly commands (`tag`, `untag`, `favorite`, `sync`) take `--all` to act on
-every copy at once.
+behind them — single-disc commands, including `bag add`/`bag remove`, just ask which copy you mean
+(prompting when a mold has more than one), using whatever tells them apart (plastic, weight, color).
+For scripting, `list --ids` reveals those ids and `edit --id`/`bag --id` targets one directly. And
+the bulk-friendly commands (`tag`, `untag`, `favorite`, `sync`, `bag add`, `bag remove`) take
+`--all` to act on every copy of the mold at once.
 
 ### Analysis
 
@@ -303,11 +304,14 @@ discbag usage [<disc>]                              # per-disc, or overall (most
 discbag practice [--count N]                        # form-focused practice discs
 discbag choose --distance N --wind head|tail|none --shape straight|hyzer|anhyzer|turnover
 discbag overlap                                     # near-duplicate discs (by how they fly for you)
-discbag compare <disc...>                           # side-by-side table + verdict (bag or database)
+discbag compare <disc...>                           # side-by-side table + verdict (inventory or database)
 discbag chart [--type flight|grid|stability|speed|composition|brands]
 discbag maturity                                    # where your collection sits today, and why
 discbag flight <disc> 6/5/-1/2 [--distance N] [--confidence 1-5] [--clear]
 ```
+
+Live-shot commands (`choose`, `practice`) read your carry bag; planning commands (`build-bag`,
+`recommend`, `overlap`, `chart`, `maturity`) read your whole active inventory.
 
 Use tracking is session-level, not throw-by-throw — it just answers *which discs did I use this
 session*. Rounds and practice are recorded separately but both bump the same **use count**, so
@@ -331,7 +335,7 @@ recently, `development` nudges toward under-used discs, and `fun` revisits ones 
 
 `flight` records how a disc actually flies **for you** (`--clear` removes it). `compare` shows
 speed/glide/turn/fade plus a derived **Stability** and **Role** row; for exactly two discs it adds a
-plain-language bottom line, and if both are in your bag, how many rounds you've thrown each:
+plain-language bottom line, and if both are discs you own, how many rounds you've thrown each:
 
 ```text
 $ discbag compare wave wraith
@@ -375,15 +379,15 @@ determines maturity, so a mature player can buy a new mold out of curiosity with
 ```bash
 discbag explain build-bag [--goal G] [--rotate] [--windy|--woods|...]  # why each role's disc won
 discbag explain role "Control fairway"                                  # ranked candidate scores
-discbag score <disc...> [--goal G] [--role NAME] [--situation S] [--verbose|-v]
+discbag score <disc...> [--goal G] [--role NAME] [--verbose|-v]
 discbag sync [<disc>] [--all]       # refresh cached stats (keeps your metadata)
 discbag updatedb                    # refresh the whole disc database from the source
 discbag db-info                     # database size and age
 ```
 
 `explain` and `score` are verbose views into *why* the engine chose what it did — useful for tuning.
-`score` breaks a total into components (role fit, the goal's sub-terms, a scenario adjustment) that
-sum to the points shown, and only lists components the engine actually used.
+`score` breaks a total into components (role fit and the goal's sub-terms) that sum to the points
+shown, and only lists components the engine actually used.
 
 ---
 
