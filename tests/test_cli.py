@@ -806,6 +806,16 @@ def test_cmd_build_bag_labels_size_omissions_separately(tmp_path, capsys):
     assert "Left out to fit" in out
 
 
+def test_cmd_build_bag_empty_inventory_stops(tmp_path, capsys):
+    from discbag import inventory
+    inv = inventory.Inventory(path=tmp_path / "inventory.json")
+    rc = cli.cmd_build_bag(_ns(size=None, situation=None, goal="coverage", rotate=False), inv)
+    out = capsys.readouterr().out
+    assert "no discs yet" in out.lower()
+    assert "Recommended bag" not in out          # doesn't fall through on an empty inventory
+    assert rc == 0
+
+
 def test_choose_empty_carry_bag_message(tmp_path, capsys):
     inv = _bag_with(tmp_path, ("Mako3", 5, 0, 0))
     inv.set_in_bag("mako3", False)                     # nothing carried

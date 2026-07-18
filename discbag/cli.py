@@ -789,6 +789,7 @@ def cmd_build_bag(args, inv):
 
     if not discs:
         print("You have no discs yet — add one with: discbag add <name>")
+        return 0
     situ = f", {args.situation}" if args.situation else ""
     rot = ", rotating" if args.rotate else ""
     print(f"Recommended bag (goal: {args.goal}{situ}{rot}):\n")
