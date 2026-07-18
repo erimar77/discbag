@@ -602,11 +602,6 @@ def cmd_sync(args, inv):
     return 0
 
 
-def _not_found(name):
-    print(f"No disc named '{name}' in your bag.")
-    return 1
-
-
 def cmd_tag(args, inv):
     targets = _resolve(inv, args.disc, args=args, allow_all=True)
     if targets is None:
@@ -662,6 +657,10 @@ def cmd_bag(args, inv):
 
     name = " ".join(args.name).strip()
     disc_id = getattr(args, "id", None)
+    if not name and not disc_id:
+        print("Name a disc, or pass --id. Usage: discbag bag add|remove <name>",
+              file=sys.stderr)
+        return 1
     if disc_id:
         disc = inv.find_by_id(disc_id)
         if disc is None:

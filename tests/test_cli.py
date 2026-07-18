@@ -746,6 +746,18 @@ def test_bag_remove_ambiguous_non_interactive_errors(tmp_path, capsys):
     assert all(d.user.in_bag is True for d in inv.all_discs())   # nothing changed
 
 
+def test_bag_requires_a_name_or_id(tmp_path, capsys):
+    from discbag import inventory
+    inv = inventory.Inventory(path=tmp_path / "inventory.json")
+    inv.add(OwnedDisc.from_db_record(MAKO3))
+    inv.add(OwnedDisc.from_db_record(dict(MAKO3, name="Leopard", speed=6)))
+    inv.set_in_bag("mako3", False)
+    inv.set_in_bag("leopard", False)
+    rc = cli.cmd_bag(_ns(action="add", name=[], id=None, all=True), inv)
+    assert rc == 1
+    assert all(d.user.in_bag is False for d in inv.all_discs())   # guard blocked bag-all
+
+
 def _bag_with(tmp_path, *specs):
     from discbag import inventory
     inv = inventory.Inventory(path=tmp_path / "inventory.json")
