@@ -844,3 +844,11 @@ def test_score_has_no_scenario_component(tmp_path, capsys):
     role = roles.primary_role(disc)
     scored = recommend.score_disc(disc, role)
     assert not any("Scenario" in c.label for c in scored.components)
+
+
+def test_resolve_not_found_message_says_inventory(tmp_path, capsys):
+    inv = _inv_with_mako(tmp_path)
+    rc = cli.cmd_lost(_ns(name=["nonesuch"], reason=None), inv)   # resolves via _resolve
+    assert rc == 1
+    err = capsys.readouterr().err.lower()
+    assert "inventory" in err and "in your bag" not in err

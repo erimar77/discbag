@@ -327,7 +327,7 @@ def _resolve(inv, name, args=None, include_archived=False, allow_all=False):
     """
     matches = inv.match(name, include_archived=include_archived)
     if not matches:
-        print(f"No disc named '{name}' in your bag.", file=sys.stderr)
+        print(f"No disc named '{name}' in your inventory.", file=sys.stderr)
         return None
     if len(matches) == 1:
         return matches
@@ -561,10 +561,10 @@ def cmd_list(args, inv):
     if not discs:
         where = " matching that filter" if narrowed else ""
         print(f"No discs{where}." if narrowed else
-              "Your bag is empty. Add discs with: discbag add <name>")
+              "You have no discs yet. Add one with: discbag add <name>")
         return 0
     label = "matching" if narrowed else "discs"
-    print(f"Your bag ({len(discs)} {label}):\n")
+    print(f"Your inventory ({len(discs)} {label}):\n")
     show_ids = getattr(args, "ids", False)
     for d in discs:
         _print_disc_row(d)
@@ -788,7 +788,7 @@ def cmd_build_bag(args, inv):
                                  rng=rng, today=_now_iso())
 
     if not discs:
-        print("Your bag is empty — add discs first with: discbag add <name>")
+        print("You have no discs yet — add one with: discbag add <name>")
     situ = f", {args.situation}" if args.situation else ""
     rot = ", rotating" if args.rotate else ""
     print(f"Recommended bag (goal: {args.goal}{situ}{rot}):\n")
@@ -910,7 +910,7 @@ def cmd_score(args, inv):
     for name in args.discs:
         disc = _resolve_disc(name, inv, db_discs)
         if disc is None:
-            print(f"Couldn't find '{name}' in your bag or the database.")
+            print(f"Couldn't find '{name}' in your inventory or the database.")
             return 1
         role = pinned or roles.primary_role(disc)
         scores.append(recommend.score_disc(disc, role, args.goal, profile, today))
@@ -960,7 +960,7 @@ def cmd_recommend(args, inv):
         nxt = roles.best_next(owned, catalog, n=args.per_slot, profile=profile,
                               preferred_only=preferred_only)
         if nxt is None:
-            print("Your bag already covers every essential role — no purchase needed. Nice bag!")
+            print("Your inventory already covers every essential role — no purchase needed. Nice collection!")
             return 0
         print("Best Next Purchase\n")
         print(f"  {nxt.coverage.role.name}")
@@ -973,7 +973,7 @@ def cmd_recommend(args, inv):
     if args.gaps:
         assessment = [c for c in assessment if not c.covered]
         if not assessment:
-            print("Your bag covers every role — no gaps. Nice bag!")
+            print("Your inventory covers every role — no gaps. Nice collection!")
             return 0
 
     for cov in assessment:
@@ -1125,7 +1125,7 @@ def cmd_compare(args, inv):
     for name in args.discs:
         d = _resolve_disc(name, inv, db_discs)
         if d is None:
-            print(f"Couldn't find '{name}' in your bag or the database.")
+            print(f"Couldn't find '{name}' in your inventory or the database.")
             return 1
         discs.append(d)
     print(_render_table(analysis.compare(discs)))
