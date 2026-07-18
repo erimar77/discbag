@@ -167,6 +167,23 @@ def test_usage_insight_neglected():
     assert any("Boss" in s and "month" in s.lower() for s in out)
 
 
+def test_usage_insight_category_leader():
+    # round_count derives from the typed use_dates log, not use_count.
+    rounds = [{"date": "2026-07-01", "session_type": "round"},
+              {"date": "2026-07-02", "session_type": "round"},
+              {"date": "2026-07-03", "session_type": "round"}]
+    leader = OwnedDisc.from_db_record(
+        {"name": "Teebird", "brand": "Innova", "category": "x",
+         "speed": 7, "glide": 5, "turn": 0, "fade": 2, "stability": ""},
+        use_count=3, use_dates=rounds, last_used="2026-07-03")
+    other = OwnedDisc.from_db_record(
+        {"name": "Leopard", "brand": "Innova", "category": "x",
+         "speed": 7, "glide": 5, "turn": -2, "fade": 1, "stability": ""},
+        use_count=0)
+    out = maturity.usage_insights([leader, other], date(2026, 7, 14))
+    assert any("Teebird" in s and "fairway" in s.lower() and "rounds" in s.lower() for s in out)
+
+
 def test_usage_insights_capped():
     # Build many candidate insights; result must not exceed MAX_INSIGHTS.
     bag = []

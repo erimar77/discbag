@@ -281,11 +281,11 @@ def observed_preferences(active):
     groups = [_stability_group(d) for d in active]
     lean = _dominant(groups, PREF_SHARE)
     if lean == "overstable":
-        out.append("You gravitate to stable-to-overstable flights.")
+        out.append("Your bag leans stable-to-overstable.")
     elif lean == "understable":
-        out.append("You gravitate to understable flights.")
+        out.append("Your bag leans understable.")
     elif lean == "neutral":
-        out.append("You gravitate to neutral, straight-flying discs.")
+        out.append("Your bag runs neutral and straight.")
 
     # Speed cluster: only claim one when most discs fall in a narrow (≤3-wide) band.
     speeds = sorted(int(round(float(d.speed))) for d in active)
@@ -299,7 +299,7 @@ def observed_preferences(active):
         if best:
             inwin = [s for s in speeds if best[1] <= s <= best[2]]
             a, b = min(inwin), max(inwin)
-            out.append(f"Your throws center on speed {a}." if a == b
+            out.append(f"Your discs center on speed {a}." if a == b
                        else f"Your discs cluster around speed {a}–{b}.")
 
     # Brand concentration: a single dominant brand, or a clearly-dominant pair.
