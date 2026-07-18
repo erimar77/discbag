@@ -520,6 +520,8 @@ def cmd_history(args, inv):
     u = d.user
     print(f"{d.brand} {d.name}\n")
     print(f"  Status: {(u.status or 'active').capitalize()}")
+    if u.damaged:
+        print("  Damaged: yes")
     print(f"  Uses: {u.use_count or 0}")
     print(f"  Rounds: {u.round_count}")
     print(f"  Practices: {u.practice_count}")

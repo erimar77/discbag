@@ -207,6 +207,20 @@ def test_cmd_history_damaged_retire_is_one_combined_line(tmp_path, capsys):
     assert out.count("Damaged and retired") == 1     # single atomic event, one line
 
 
+def test_history_shows_current_damaged_state(tmp_path, capsys):
+    inv = _inv_with_mako(tmp_path)
+    inv.set_damaged("mako3", True, reason="cracked", when="2026-07-01T00:00:00+00:00")
+    cli.cmd_history(_ns(name=["mako3"]), inv)
+    out = capsys.readouterr().out
+    assert "Damaged: yes" in out
+
+
+def test_history_no_damaged_line_when_undamaged(tmp_path, capsys):
+    inv = _inv_with_mako(tmp_path)
+    cli.cmd_history(_ns(name=["mako3"]), inv)
+    assert "Damaged" not in capsys.readouterr().out
+
+
 def test_cmd_list_hides_archived_unless_requested(tmp_path, capsys):
     inv = _inv_with_mako(tmp_path)
     inv.add(OwnedDisc.from_db_record(dict(MAKO3, name="Leopard", speed=6)))
