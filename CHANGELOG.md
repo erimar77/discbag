@@ -7,6 +7,9 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- `discbag maturity` — a qualitative read of where your collection sits (Discovery / Developing /
+  Developed) and why, with grounded usage insights and observed preferences. Answers "do I actually
+  need anything?" rather than "what should I buy?"
 - `discbag compare` now adds a derived Stability row and, for two discs, a
   rule-derived bottom line (overlap, key difference in relative terms, and how to
   use each), plus an ownership footer when both discs are in your bag.

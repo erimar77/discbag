@@ -305,6 +305,7 @@ discbag choose --distance N --wind head|tail|none --shape straight|hyzer|anhyzer
 discbag overlap                                     # near-duplicate discs (by how they fly for you)
 discbag compare <disc...>                           # side-by-side table + verdict (bag or database)
 discbag chart [--type flight|grid|stability|speed|composition|brands]
+discbag maturity                                    # where your collection sits today, and why
 discbag flight <disc> 6/5/-1/2 [--distance N] [--confidence 1-5] [--clear]
 ```
 
@@ -360,6 +361,14 @@ fade can still reflect the throw.
 
 Charts default to a Braille-dot scatter (speed vs stability); `--type grid` is a labelled letter
 chart, and `stability`/`speed`/`composition`/`brands` are distribution histograms.
+
+`maturity` is coaching, not shopping: it answers "do I actually need anything?" It reports a
+qualitative phase — **Discovery** (real coverage gaps remain), **Developing** (covered, but your
+throwing hasn't settled), or **Developed** (covered and settled — your gains now come from reps,
+not molds) — always backed by explicit signals, never a score. It adds grounded usage insights
+(concentration, neglected discs, a primary that wants a backup) and observed preferences
+(stability, speed, and brand tendencies). Coverage gets you to the gate; how you actually throw
+determines maturity, so a mature player can buy a new mold out of curiosity without dropping back.
 
 ### Advanced
 
