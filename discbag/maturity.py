@@ -18,6 +18,10 @@ CORE_FRACTION = 1 / 3        # max core size as a fraction of the active bag
 RECENT_WINDOW = 180          # days: a "recently introduced" new mold
 MAX_RECENT_NEW_MOLDS = 1     # new molds recently before the note reads "experimenting"
 MIN_FAVORITES = 3            # supporting "established favorites" threshold
+NEGLECT_DAYS = 180           # unused this long → "neglected"
+DOMINANT_SHARE = 0.50        # category-usage share that makes a disc the clear primary
+MAX_INSIGHTS = 4             # cap on rendered usage insights
+MIN_CATEGORY_DISCS = 5       # a category needs this many discs before "concentration" is worth noting
 
 
 @dataclass
@@ -137,3 +141,112 @@ def assess_phase(active, all_discs, profile, today):
     signals = [Signal(True, "No meaningful coverage gaps"), usage, core, *supporting]
     phase = "Developed" if (usage.met and core.met) else "Developing"
     return phase, signals
+
+
+def _broad_category(disc):
+    speed = float(disc.speed)
+    if speed <= 3:
+        return "putter"
+    if speed <= 5:
+        return "midrange"
+    if speed <= 8:
+        return "fairway"
+    return "driver"
+
+
+def _by_category(active):
+    groups = {}
+    for d in active:
+        groups.setdefault(_broad_category(d), []).append(d)
+    return groups
+
+
+def _plural(cat):
+    return cat + "s"
+
+
+def _concentration_insight(cat, discs):
+    counts = sorted((_uses(d) for d in discs), reverse=True)
+    total = sum(counts)
+    if len(discs) < MIN_CATEGORY_DISCS or total == 0:
+        return None
+    target = CONCENTRATION * total
+    acc = core = 0
+    for c in counts:
+        if acc >= target:
+            break
+        acc += c
+        core += 1
+    if core >= len(discs):            # not actually concentrated
+        return None
+    pct = round(100 * acc / total)
+    return f"You own {len(discs)} {_plural(cat)}; {pct}% of those throws use {core} of them."
+
+
+def _neglected_insight(active, today):
+    stale = []
+    for d in active:
+        if not getattr(d.user, "in_bag", True):
+            continue
+        last = _parse_date(d.user.last_used)
+        added = _parse_date(d.user.date_added)
+        if last is not None:
+            age = (today - last).days
+        elif added is not None:
+            age = (today - added).days       # never thrown; age since acquired
+        else:
+            continue
+        if age > NEGLECT_DAYS:
+            stale.append((age, d))
+    if not stale:
+        return None
+    stale.sort(key=lambda t: t[0], reverse=True)
+    name = f"{stale[0][1].brand} {stale[0][1].mold}"
+    months = stale[0][0] // 30
+    return f"You haven't thrown your {name} in {months}+ months — it may not need a bag spot."
+
+
+def _primary_backup_insight(active):
+    from discbag import analysis
+    for cat, discs in _by_category(active).items():
+        total = sum(_uses(d) for d in discs)
+        if total == 0 or len(discs) < 2:
+            continue
+        top = max(discs, key=_uses)
+        if _uses(top) / total < DOMINANT_SHARE:
+            continue
+        # A backup exists if any other disc overlaps the primary's flight.
+        others = [d for d in discs if d is not top]
+        has_backup = any(top in g and any(o in g for o in others)
+                         for g in analysis.overlap([top] + others))
+        if not has_backup:
+            return (f"Your {top.brand} {top.mold} is your most-thrown {cat} — "
+                    "consider a backup before a new mold.")
+    return None
+
+
+def _category_leader_insight(active):
+    best = None
+    for cat, discs in _by_category(active).items():
+        if len(discs) < 2:
+            continue
+        top = max(discs, key=lambda d: d.user.round_count)
+        if top.user.round_count <= 0:
+            continue
+        if best is None or top.user.round_count > best[0]:
+            best = (top.user.round_count, f"Your {top.brand} {top.mold} leads your "
+                    f"{_plural(cat)} in rounds.")
+    return best[1] if best else None
+
+
+def usage_insights(active, today):
+    """Grounded observations from usage history, most-salient first, capped."""
+    groups = _by_category(active)
+    candidates = []
+    candidates.append(_neglected_insight(active, today))
+    candidates.append(_primary_backup_insight(active))
+    for cat, discs in sorted(groups.items(), key=lambda kv: -len(kv[1])):
+        candidates.append(_concentration_insight(cat, discs))
+    candidates.append(_category_leader_insight(active))
+    out = [c for c in candidates if c]
+    return out[:MAX_INSIGHTS]

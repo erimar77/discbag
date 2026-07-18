@@ -142,3 +142,37 @@ def test_developed_stays_developed_after_new_molds(monkeypatch):
     phase, signals = maturity.assess_phase(bag, bag, None, TODAY)
     assert phase == "Developed"                                    # not demoted
     assert any(("experimenting" in s.text.lower()) and not s.met for s in signals)  # supporting •
+
+
+# ---------- usage insights ----------
+
+def test_broad_category_by_speed():
+    assert maturity._broad_category(owned("Aviar", speed=2)) == "putter"
+    assert maturity._broad_category(owned("Buzzz", speed=5)) == "midrange"
+    assert maturity._broad_category(owned("Teebird", speed=7)) == "fairway"
+    assert maturity._broad_category(owned("Wraith", speed=11)) == "driver"
+
+
+def test_usage_insight_concentration():
+    drivers = [owned("Wave", speed=11, uses=40), owned("Wraith", speed=11, uses=40)]
+    drivers += [owned(f"Dr{i}", speed=11, uses=1) for i in range(4)]   # 6 drivers total
+    out = maturity.usage_insights(drivers, TODAY)
+    assert any("6 drivers" in s and "%" in s for s in out)
+
+
+def test_usage_insight_neglected():
+    bag = [owned("Buzzz", speed=5, uses=30, last="2026-07-10"),
+           owned("Boss", speed=13, uses=2, last="2025-06-01")]   # >180 days stale
+    out = maturity.usage_insights(bag, TODAY)
+    assert any("Boss" in s and "month" in s.lower() for s in out)
+
+
+def test_usage_insights_capped():
+    # Build many candidate insights; result must not exceed MAX_INSIGHTS.
+    bag = []
+    for cat_speed in (2, 5, 7, 11):
+        bag.append(owned(f"lead{cat_speed}", speed=cat_speed, uses=50, last="2026-07-10"))
+        bag += [owned(f"n{cat_speed}_{i}", speed=cat_speed, uses=1, last="2024-01-01")
+                for i in range(6)]
+    out = maturity.usage_insights(bag, TODAY)
+    assert len(out) <= maturity.MAX_INSIGHTS
