@@ -64,9 +64,17 @@ If there are no meaningful gaps, examine settledness signals (each a boolean wit
 2. **Settled core** — a small handful of discs accounts for most throws: the fewest active discs
    whose combined `use_count` reaches `CONCENTRATION` of all recorded uses is at most
    `CORE_FRACTION` of the active bag.
-3. **No new overlapping molds** — among active discs added within `RECENT_WINDOW`, at most
-   `MAX_RECENT_OVERLAP` overlap an existing disc (via `analysis.overlap`). No recent additions
-   counts as satisfied (you've stopped adding).
+3. **Not chasing new molds — refining, not exploring.** The behavior that signals immaturity is
+   still *searching for what works* — bringing in genuinely **new molds** — not simply buying
+   something similar to what you own. Count the distinct molds whose **first** acquisition
+   (earliest `date_added` across all your copies of that mold, active or archived) falls within
+   `RECENT_WINDOW`; the signal is met when that count is at most `MAX_RECENT_NEW_MOLDS`.
+
+   Crucially, another copy of a mold you **already own** introduces no new mold, so it never counts
+   against you: a backup of a favorite, a same-mold replacement (what `replace` produces), another
+   plastic or weight, cycling a fresh Roc or Wizard. Those are refinement — the mark of a settled
+   player who knows what they like — not exploration. No recent acquisitions at all also counts as
+   met.
 
 **Established favorites** (`favorites ≥ MIN_FAVORITES`) is shown as a **supporting** signal in the
 "why" list but is **not required** for `Developed` — marking favorites is a manual action, and its
@@ -76,7 +84,7 @@ absence doesn't prove a player is unsettled.
 - **`Developed`** — no meaningful gaps **and** all three behavioral signals (1, 2, 3) met.
   Message: *"Another disc is unlikely to improve your game right now — your gains are in reps."*
 - **`Developing`** — no meaningful gaps, but at least one behavioral signal is unmet (throws still
-  spread out, still adding overlapping molds, or **not enough usage history to judge**). A
+  spread out, still bringing in new molds, or **not enough usage history to judge**). A
   freshly-stocked full-coverage bag with no rounds logged lands here, never `Developed`.
 
 Phase labels are **Discovery → Developing → Developed** (a three-state refinement of the proposal's
@@ -91,7 +99,7 @@ Collection Maturity
 Why:
   ✓ No meaningful coverage gaps
   ✓ 84% of your throws use just 4 discs — you've settled on a core
-  ✓ No overlapping molds added recently
+  ✓ Recent additions refine molds you already own, not new experiments
   ✓ 6 established favorites
 
 Another disc is unlikely to improve your game right now.
@@ -146,8 +154,8 @@ Written as named module constants so they can be tuned without touching logic:
 | `ACTIVE_WINDOW` | 90 days | "Thrown recently" for the consistent-usage signal. |
 | `CONCENTRATION` | 0.80 | Share of throws that a "core" must cover. |
 | `CORE_FRACTION` | 1/3 | Max size of that core, as a fraction of the active bag. |
-| `RECENT_WINDOW` | 180 days | Window for "recently added" molds. |
-| `MAX_RECENT_OVERLAP` | 1 | Recent overlapping additions allowed while still "settled". |
+| `RECENT_WINDOW` | 180 days | Window for a "recently introduced" new mold. |
+| `MAX_RECENT_NEW_MOLDS` | 1 | New molds first acquired within `RECENT_WINDOW` allowed while still "settled" (backups/replacements/plastic/weight variants of owned molds never count). |
 | `MIN_FAVORITES` | 3 | Threshold for the supporting "established favorites" signal. |
 | `NEGLECT_DAYS` | 180 | Age past which an unused in-bag disc is "neglected". |
 | `DOMINANT_SHARE` | 0.50 | Category-usage share that makes a disc the clear primary. |
@@ -157,11 +165,13 @@ Written as named module constants so they can be tuned without touching logic:
 
 New pure module **`maturity.py`** (analysis layer), fully unit-testable:
 
-- `report(bag, profile, catalog, today)` → a `MaturityReport` dataclass holding `phase` (str),
-  `signals` (list of `Signal{met: bool, text: str}`), `insights` (list of str), and `preferences`
-  (list of str). `today` (a `date`) is injected for deterministic age math (mirrors the injectable
-  `now` in `db.update_db`).
-- Internal helpers per concern: the gate (over `roles.assess`), the behavior signals, the usage
+- `report(active_discs, all_discs, profile, catalog, today)` → a `MaturityReport` dataclass holding
+  `phase` (str), `signals` (list of `Signal{met: bool, text: str}`), `insights` (list of str), and
+  `preferences` (list of str). Most logic reasons about `active_discs`; the "not chasing new molds"
+  signal needs `all_discs` (active **and** archived) so a rebought mold you once owned counts as
+  refinement, not a new mold. `today` (a `date`) is injected for deterministic age math (mirrors
+  the injectable `now` in `db.update_db`).
+- Internal helpers per concern: the gate (over `roles.assess`), each behavior signal, the usage
   insights, the preferences — each independently testable.
 
 `cli.py` gets `cmd_maturity`, which builds the report and renders it — colorized in a terminal,
@@ -176,7 +186,13 @@ Reuses: `roles.assess`, `roles.stability_number`/`stability_word`, `analysis.ove
 - **Gate:** a meaningful (High/Medium, non-optional) missing role → `Discovery`; a missing *Low*
   role or an optional role does **not** force Discovery; empty/tiny bag → `Discovery`.
 - **Behavior:** full coverage + all three behavioral signals → `Developed`; full coverage but
-  spread-out usage, or recent overlapping additions, or usage below `MIN_USES` → `Developing`.
+  spread-out usage, or a recent new mold beyond `MAX_RECENT_NEW_MOLDS`, or usage below `MIN_USES`
+  → `Developing`.
+- **Refinement is not exploration:** a settled `Developed` bag stays `Developed` after buying a
+  backup of an owned mold, a same-mold `replace`, or another plastic/weight of a mold it owns
+  (no new mold introduced). Rebuying a mold you previously owned and archived also counts as
+  refinement, not a new mold. Adding a genuinely new mold beyond the threshold does move it to
+  `Developing`.
 - **Favorites are supporting, not required:** a settled bag with zero favorites still reaches
   `Developed`.
 - **Usage insights:** each insight fires at its threshold and is absent below it; the render cap is
