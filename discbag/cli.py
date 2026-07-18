@@ -636,14 +636,25 @@ def cmd_bag(args, inv):
             _print_disc_row(d)
         return 0
 
-    name = " ".join(args.name)
+    name = " ".join(args.name).strip()
+    disc_id = getattr(args, "id", None)
+    if disc_id:
+        disc = inv.find_by_id(disc_id)
+        if disc is None:
+            print(f"No disc with id '{disc_id}'.", file=sys.stderr)
+            return 1
+        targets = [disc]
+    else:
+        targets = _resolve(inv, name, args=args, allow_all=True)
+        if targets is None:
+            return 1
     value = args.action == "add"
-    n = inv.set_in_bag(name, value)
-    if not n:
-        return _not_found(name)
+    for d in targets:
+        inv.set_in_bag(d, value)
+    label = name or targets[0].name
     verb = "Put" if value else "Pulled"
     where = "in the bag" if value else "out of the bag"
-    print(f"{verb} {n} {name} disc(s) {where}.")
+    print(f"{verb} {len(targets)} {label} disc(s) {where}.")
     return 0
 
 
@@ -1614,6 +1625,9 @@ def build_parser():
     p_bagcmd = sub.add_parser("bag", help="manage which owned discs are currently carried")
     p_bagcmd.add_argument("action", choices=["add", "remove", "list"])
     p_bagcmd.add_argument("name", nargs="*")
+    p_bagcmd.add_argument("--id", dest="id", help="target one copy by id (see 'list --ids')")
+    p_bagcmd.add_argument("--all", action="store_true",
+                          help="apply to every copy of the mold")
     p_bagcmd.set_defaults(func=cmd_bag)
 
     # round-used / used record a round; practice-used records a practice session.

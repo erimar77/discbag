@@ -696,3 +696,34 @@ def test_cmd_maturity_empty_bag(tmp_path, capsys):
     out = capsys.readouterr().out
     assert "Discovery" in out
     assert "empty" in out.lower()
+
+
+def test_bag_remove_targets_one_copy(tmp_path, capsys, monkeypatch):
+    from discbag import inventory
+    inv = inventory.Inventory(path=tmp_path / "inventory.json")
+    inv.add(OwnedDisc.from_db_record(MAKO3))
+    inv.add(OwnedDisc.from_db_record(MAKO3))
+    target = inv.all_discs()[1]
+    # Non-interactive resolve-by-id path: pass the id so it targets one copy.
+    cli.cmd_bag(_ns(action="remove", name=["mako3"], id=target.id, all=False), inv)
+    assert inv.find_by_id(target.id).user.in_bag is False
+    assert inv.all_discs()[0].user.in_bag is True          # the other copy untouched
+
+
+def test_bag_remove_all_pulls_every_copy(tmp_path, capsys):
+    from discbag import inventory
+    inv = inventory.Inventory(path=tmp_path / "inventory.json")
+    inv.add(OwnedDisc.from_db_record(MAKO3))
+    inv.add(OwnedDisc.from_db_record(MAKO3))
+    cli.cmd_bag(_ns(action="remove", name=["mako3"], id=None, all=True), inv)
+    assert all(d.user.in_bag is False for d in inv.all_discs())
+
+
+def test_bag_remove_ambiguous_non_interactive_errors(tmp_path, capsys):
+    from discbag import inventory
+    inv = inventory.Inventory(path=tmp_path / "inventory.json")
+    inv.add(OwnedDisc.from_db_record(MAKO3))
+    inv.add(OwnedDisc.from_db_record(MAKO3))
+    rc = cli.cmd_bag(_ns(action="remove", name=["mako3"], id=None, all=False), inv)
+    assert rc == 1
+    assert all(d.user.in_bag is True for d in inv.all_discs())   # nothing changed
