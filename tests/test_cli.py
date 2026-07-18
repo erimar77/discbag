@@ -727,3 +727,46 @@ def test_bag_remove_ambiguous_non_interactive_errors(tmp_path, capsys):
     rc = cli.cmd_bag(_ns(action="remove", name=["mako3"], id=None, all=False), inv)
     assert rc == 1
     assert all(d.user.in_bag is True for d in inv.all_discs())   # nothing changed
+
+
+def _bag_with(tmp_path, *specs):
+    from discbag import inventory
+    inv = inventory.Inventory(path=tmp_path / "inventory.json")
+    for mold, speed, turn, fade in specs:
+        rec = {"name": mold, "brand": "Innova", "category": "x",
+               "speed": speed, "glide": 5, "turn": turn, "fade": fade, "stability": ""}
+        inv.add(OwnedDisc.from_db_record(rec))
+    return inv
+
+
+def test_choose_uses_carry_bag_not_inventory(tmp_path, capsys):
+    inv = _bag_with(tmp_path, ("Destroyer", 12, -1, 3), ("Teebird", 7, 0, 2))
+    inv.set_in_bag("destroyer", False)               # pulled from the carry bag
+    cli.cmd_choose(_ns(distance=350, wind=None, shape="straight"), inv)
+    out = capsys.readouterr().out
+    assert "Destroyer" not in out                    # out-of-bag disc not recommended
+
+
+def test_practice_uses_carry_bag(tmp_path, capsys):
+    inv = _bag_with(tmp_path, ("Mako3", 5, 0, 0), ("Firebird", 9, 0, 4))
+    inv.set_in_bag("firebird", False)
+    cli.cmd_practice(_ns(count=3), inv)
+    out = capsys.readouterr().out
+    assert "Firebird" not in out
+
+
+def test_build_bag_still_uses_full_inventory(tmp_path, capsys):
+    # Planning reasons over inventory, including out-of-bag discs.
+    inv = _bag_with(tmp_path, ("Destroyer", 12, -1, 3))
+    inv.set_in_bag("destroyer", False)
+    cli.cmd_build_bag(_ns(size=None, situation=None, goal="coverage", rotate=False), inv)
+    out = capsys.readouterr().out
+    assert "Destroyer" in out                         # still considered for planning
+
+
+def test_choose_empty_carry_bag_message(tmp_path, capsys):
+    inv = _bag_with(tmp_path, ("Mako3", 5, 0, 0))
+    inv.set_in_bag("mako3", False)                     # nothing carried
+    cli.cmd_choose(_ns(distance=200, wind=None, shape=None), inv)
+    out = capsys.readouterr().out
+    assert "no discs in your bag" in out.lower()

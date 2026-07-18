@@ -1115,11 +1115,11 @@ def cmd_compare(args, inv):
 def cmd_choose(args, inv):
     from discbag import analysis
     prof = player.load_profile()
-    picks = analysis.choose(inv.list_discs(), distance=args.distance,
+    picks = analysis.choose(inv.filter(in_bag=True), distance=args.distance,
                             wind=args.wind, shape=args.shape,
                             profile=None if prof.is_empty() else prof)
     if not picks:
-        print("Your bag is empty — add discs first with: discbag add <name>")
+        print("No discs in your bag. Put discs in with: discbag bag add <name>")
         return 0
     parts = []
     if args.distance:
@@ -1144,10 +1144,10 @@ def cmd_choose(args, inv):
 def cmd_practice(args, inv):
     from discbag import analysis
     prof = player.load_profile()
-    picks = analysis.practice(inv.list_discs(), count=args.count,
+    picks = analysis.practice(inv.filter(in_bag=True), count=args.count,
                               profile=None if prof.is_empty() else prof)
     if not picks:
-        print("Your bag is empty — add discs first with: discbag add <name>")
+        print("No discs in your bag. Put discs in with: discbag bag add <name>")
         return 0
     print("Today's Practice Recommendation\n")
     for d in picks:
@@ -1718,14 +1718,14 @@ def build_parser():
     p_cmp.add_argument("discs", nargs="+")
     p_cmp.set_defaults(func=cmd_compare)
 
-    p_choose = sub.add_parser("choose", help="pick the best disc from your bag for a shot")
+    p_choose = sub.add_parser("choose", help="pick the best disc from your carry bag for a shot")
     p_choose.add_argument("--distance", type=int, help="shot distance in feet")
     p_choose.add_argument("--wind", choices=["head", "tail", "none"], help="wind direction")
     p_choose.add_argument("--shape", choices=["straight", "hyzer", "anhyzer", "turnover"],
                           help="desired shot shape")
     p_choose.set_defaults(func=cmd_choose)
 
-    p_prac = sub.add_parser("practice", help="discs to throw for a form-focused practice session")
+    p_prac = sub.add_parser("practice", help="carry-bag discs to throw for a form-focused practice session")
     p_prac.add_argument("--count", type=int, default=3, help="how many discs (default 3)")
     p_prac.set_defaults(func=cmd_practice)
 
