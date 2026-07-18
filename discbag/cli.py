@@ -2,10 +2,32 @@
 
 import argparse
 import sys
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 
 from discbag import db, history, player, roles
 from discbag.inventory import Disc, Inventory, OwnedDisc
+
+
+# ---------- argparse validators ----------
+
+def _positive_int(s):
+    """argparse type: a positive integer (>= 1)."""
+    try:
+        value = int(s)
+    except (TypeError, ValueError):
+        raise argparse.ArgumentTypeError("must be a positive integer")
+    if value < 1:
+        raise argparse.ArgumentTypeError("must be a positive integer")
+    return value
+
+
+def _iso_date(s):
+    """argparse type: a date in YYYY-MM-DD form (returns the original string)."""
+    try:
+        date.fromisoformat(s)
+    except (TypeError, ValueError):
+        raise argparse.ArgumentTypeError("must be a date in YYYY-MM-DD form")
+    return s
 
 
 # ---------- pure formatting helpers ----------
@@ -1639,7 +1661,7 @@ def build_parser():
             ("used", "round", "alias of round-used")]:
         p_used = sub.add_parser(cmd_name, help=cmd_help)
         p_used.add_argument("discs", nargs="+")
-        p_used.add_argument("--date", help="record for a specific date (YYYY-MM-DD)")
+        p_used.add_argument("--date", type=_iso_date, help="record for a specific date (YYYY-MM-DD)")
         p_used.set_defaults(func=cmd_used, session_type=session_type)
 
     p_usage = sub.add_parser("usage", help="show disc use stats (per disc or overall)")
@@ -1655,7 +1677,7 @@ def build_parser():
     p_sync.set_defaults(func=cmd_sync)
 
     p_bag = sub.add_parser("build-bag", help="recommend a bag by role from your inventory")
-    p_bag.add_argument("--size", "-n", type=int, help="limit to this many discs")
+    p_bag.add_argument("--size", "-n", type=_positive_int, help="limit to this many discs")
     p_bag.add_argument("--goal",
                        choices=["coverage", "development", "confidence", "tournament", "fun"],
                        default="coverage",
@@ -1693,7 +1715,7 @@ def build_parser():
 
     p_rec = sub.add_parser("recommend",
                            help="assess bag coverage; suggest discs for missing roles")
-    p_rec.add_argument("--per-slot", type=int, default=3,
+    p_rec.add_argument("--per-slot", type=_positive_int, default=3,
                        help="how many suggestions per missing slot (default 3)")
     p_rec.add_argument("--gaps", action="store_true",
                        help="only show missing roles")
@@ -1726,7 +1748,7 @@ def build_parser():
     p_choose.set_defaults(func=cmd_choose)
 
     p_prac = sub.add_parser("practice", help="carry-bag discs to throw for a form-focused practice session")
-    p_prac.add_argument("--count", type=int, default=3, help="how many discs (default 3)")
+    p_prac.add_argument("--count", type=_positive_int, default=3, help="how many discs (default 3)")
     p_prac.set_defaults(func=cmd_practice)
 
     p_prof = sub.add_parser("profile", help="show or set your player profile")

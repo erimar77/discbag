@@ -1,3 +1,6 @@
+import argparse
+import pytest
+
 from discbag import cli
 from discbag.inventory import Disc, OwnedDisc
 
@@ -770,3 +773,25 @@ def test_choose_empty_carry_bag_message(tmp_path, capsys):
     cli.cmd_choose(_ns(distance=200, wind=None, shape=None), inv)
     out = capsys.readouterr().out
     assert "no discs in your bag" in out.lower()
+
+
+def test_positive_int_validator():
+    assert cli._positive_int("3") == 3
+    for bad in ("0", "-1", "abc"):
+        with pytest.raises(argparse.ArgumentTypeError):
+            cli._positive_int(bad)
+
+
+def test_iso_date_validator():
+    assert cli._iso_date("2026-07-03") == "2026-07-03"
+    for bad in ("not-a-date", "2026-13-40", "07/03/2026"):
+        with pytest.raises(argparse.ArgumentTypeError):
+            cli._iso_date(bad)
+
+
+def test_parser_rejects_bad_date_and_count():
+    parser = cli.build_parser()
+    with pytest.raises(SystemExit):
+        parser.parse_args(["round-used", "mako3", "--date", "not-a-date"])
+    with pytest.raises(SystemExit):
+        parser.parse_args(["practice", "--count", "-1"])
