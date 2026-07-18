@@ -194,10 +194,24 @@ def test_preferences_brand_concentration():
 
 
 def test_preferences_empty_when_mixed():
-    # Even split across brands and stabilities -> no confident observation.
-    bag = [owned("A", brand="Innova", turn=-2, fade=0),
-           owned("B", brand="Discraft", turn=0, fade=3),
-           owned("C", brand="MVP", turn=-1, fade=1),
-           owned("D", brand="Latitude 64", turn=1, fade=0)]
+    # Varied brands, stabilities, AND speeds -> no confident observation at all.
+    bag = [owned("A", brand="Innova", speed=3, turn=-2, fade=0),
+           owned("B", brand="Discraft", speed=6, turn=0, fade=3),
+           owned("C", brand="MVP", speed=9, turn=-1, fade=1),
+           owned("D", brand="Latitude 64", speed=12, turn=1, fade=0)]
+    assert maturity.observed_preferences(bag) == []
+
+
+def test_preferences_no_false_brand_pair_on_even_split():
+    bag = ([owned(f"I{i}", brand="Innova", speed=5) for i in range(3)]
+           + [owned(f"D{i}", brand="Discraft", speed=5) for i in range(3)]
+           + [owned(f"M{i}", brand="MVP", speed=5) for i in range(3)])
     out = maturity.observed_preferences(bag)
-    assert not any("gravitate" in s.lower() for s in out)      # no stability lean claimed
+    assert not any("and" in s and "bag is" in s for s in out)   # no two-brand claim
+
+
+def test_preferences_speed_cluster_only_when_clustered():
+    clustered = [owned(f"c{i}", speed=s) for i, s in enumerate([5, 5, 6, 7, 5])]
+    assert any("speed" in s for s in maturity.observed_preferences(clustered))
+    spread = [owned(f"s{i}", speed=s) for i, s in enumerate([2, 5, 8, 11, 13])]
+    assert not any("speed" in s for s in maturity.observed_preferences(spread))

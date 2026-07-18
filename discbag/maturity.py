@@ -5,6 +5,7 @@ The CLI composes and renders these; keep rendering out of here.
 """
 
 import math
+from collections import Counter
 from dataclasses import dataclass
 from datetime import date
 
@@ -286,20 +287,32 @@ def observed_preferences(active):
     elif lean == "neutral":
         out.append("You gravitate to neutral, straight-flying discs.")
 
-    speeds = sorted(float(d.speed) for d in active)
+    # Speed cluster: only claim one when most discs fall in a narrow (≤3-wide) band.
+    speeds = sorted(int(round(float(d.speed))) for d in active)
     if len(speeds) >= 4:
-        lo = speeds[len(speeds) // 10]
-        hi = speeds[-(len(speeds) // 10) - 1]
-        out.append(f"Your discs cluster around speed {int(lo)}–{int(hi)}.")
+        best = None
+        for lo in range(speeds[0], speeds[-1] + 1):
+            hi = lo + 2
+            cnt = sum(1 for s in speeds if lo <= s <= hi)
+            if cnt / len(speeds) >= PREF_SHARE and (best is None or cnt > best[0]):
+                best = (cnt, lo, hi)
+        if best:
+            inwin = [s for s in speeds if best[1] <= s <= best[2]]
+            a, b = min(inwin), max(inwin)
+            out.append(f"Your throws center on speed {a}." if a == b
+                       else f"Your discs cluster around speed {a}–{b}.")
 
+    # Brand concentration: a single dominant brand, or a clearly-dominant pair.
     brands = [str(d.brand) for d in active if str(d.brand)]
-    counts = {}
-    for b in brands:
-        counts[b] = counts.get(b, 0) + 1
-    top = sorted(counts.items(), key=lambda kv: -kv[1])
-    if top and brands:
-        lead = [b for b, n in top if n / len(brands) >= 0.25][:2]
-        if lead and sum(counts[b] for b in lead) / len(brands) >= PREF_SHARE:
-            out.append(f"Most of your bag is {' and '.join(lead)}.")
+    if brands:
+        ranked = Counter(brands).most_common()
+        n = len(brands)
+        if ranked[0][1] / n >= PREF_SHARE:
+            out.append(f"Most of your bag is {ranked[0][0]}.")
+        elif len(ranked) >= 2:
+            pair = ranked[0][1] + ranked[1][1]
+            third = ranked[2][1] if len(ranked) >= 3 else 0
+            if pair / n >= PREF_SHARE and ranked[1][1] > third:
+                out.append(f"Most of your bag is {ranked[0][0]} and {ranked[1][0]}.")
 
     return out
