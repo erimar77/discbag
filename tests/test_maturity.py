@@ -176,3 +176,28 @@ def test_usage_insights_capped():
                 for i in range(6)]
     out = maturity.usage_insights(bag, TODAY)
     assert len(out) <= maturity.MAX_INSIGHTS
+
+
+# ---------- observed preferences ----------
+
+def test_preferences_stability_lean():
+    # A bag that leans overstable (turn+fade high).
+    bag = [owned(f"OS{i}", turn=0, fade=3) for i in range(5)] + [owned("N", turn=-1, fade=1)]
+    out = maturity.observed_preferences(bag)
+    assert any("overstable" in s.lower() for s in out)
+
+
+def test_preferences_brand_concentration():
+    bag = [owned(f"I{i}", brand="Innova") for i in range(7)] + [owned("X", brand="MVP")]
+    out = maturity.observed_preferences(bag)
+    assert any("Innova" in s for s in out)
+
+
+def test_preferences_empty_when_mixed():
+    # Even split across brands and stabilities -> no confident observation.
+    bag = [owned("A", brand="Innova", turn=-2, fade=0),
+           owned("B", brand="Discraft", turn=0, fade=3),
+           owned("C", brand="MVP", turn=-1, fade=1),
+           owned("D", brand="Latitude 64", turn=1, fade=0)]
+    out = maturity.observed_preferences(bag)
+    assert not any("gravitate" in s.lower() for s in out)      # no stability lean claimed

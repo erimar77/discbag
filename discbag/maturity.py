@@ -22,6 +22,7 @@ NEGLECT_DAYS = 180           # unused this long → "neglected"
 DOMINANT_SHARE = 0.50        # category-usage share that makes a disc the clear primary
 MAX_INSIGHTS = 4             # cap on rendered usage insights
 MIN_CATEGORY_DISCS = 5       # a category needs this many discs before "concentration" is worth noting
+PREF_SHARE = 0.60            # share needed before a tendency is called out
 
 
 @dataclass
@@ -250,3 +251,55 @@ def usage_insights(active, today):
     candidates.append(_category_leader_insight(active))
     out = [c for c in candidates if c]
     return out[:MAX_INSIGHTS]
+
+
+def _stability_group(disc):
+    stab = roles.stability_number(disc)
+    if stab <= -0.5:
+        return "understable"
+    if stab < 1.5:
+        return "neutral"
+    return "overstable"
+
+
+def _dominant(labels, share):
+    """The single label holding >= share of the list, or None."""
+    if not labels:
+        return None
+    counts = {}
+    for x in labels:
+        counts[x] = counts.get(x, 0) + 1
+    label, n = max(counts.items(), key=lambda kv: kv[1])
+    return label if n / len(labels) >= share else None
+
+
+def observed_preferences(active):
+    """Grounded tendencies, phrased as observations. Empty when nothing is clear."""
+    out = []
+
+    groups = [_stability_group(d) for d in active]
+    lean = _dominant(groups, PREF_SHARE)
+    if lean == "overstable":
+        out.append("You gravitate to stable-to-overstable flights.")
+    elif lean == "understable":
+        out.append("You gravitate to understable flights.")
+    elif lean == "neutral":
+        out.append("You gravitate to neutral, straight-flying discs.")
+
+    speeds = sorted(float(d.speed) for d in active)
+    if len(speeds) >= 4:
+        lo = speeds[len(speeds) // 10]
+        hi = speeds[-(len(speeds) // 10) - 1]
+        out.append(f"Your discs cluster around speed {int(lo)}–{int(hi)}.")
+
+    brands = [str(d.brand) for d in active if str(d.brand)]
+    counts = {}
+    for b in brands:
+        counts[b] = counts.get(b, 0) + 1
+    top = sorted(counts.items(), key=lambda kv: -kv[1])
+    if top and brands:
+        lead = [b for b, n in top if n / len(brands) >= 0.25][:2]
+        if lead and sum(counts[b] for b in lead) / len(brands) >= PREF_SHARE:
+            out.append(f"Most of your bag is {' and '.join(lead)}.")
+
+    return out
