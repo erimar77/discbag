@@ -495,11 +495,14 @@ class Inventory:
         (any non-active status) removes it from the carry bag but keeps its history.
         Returns discs updated. Reaches archived discs too (for restore)."""
         def apply(u):
+            was_active = (u.status or "active") == "active"
             u.status = status
             u.status_reason = reason
             u.status_date = when
             if status != "active":
                 u.in_bag = False
+            elif not was_active:          # restoring from an archived state → back in the bag
+                u.in_bag = True
             u.log_event(_status_event(when, status, reason))
         return self._mutate(name, apply)
 

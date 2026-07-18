@@ -201,6 +201,17 @@ def test_set_status_appends_status_event_including_restore(tmp_path):
     assert status_events[0]["reason"] == "hole 7"
 
 
+def test_restore_returns_disc_to_carry_bag(tmp_path):
+    inv = make_inv(tmp_path)
+    inv.add(OwnedDisc.from_db_record(MAKO3))
+    inv.set_status("mako3", "lost", reason="hole 7")      # archived: in_bag -> False
+    assert inv.all_discs()[0].user.in_bag is False
+    inv.set_status("mako3", "active")                     # restore
+    u = inv.all_discs()[0].user
+    assert u.status == "active" and u.in_bag is True
+    assert inv.filter(in_bag=True)                        # shows up in the carry bag
+
+
 def test_set_damaged_true_logs_event_false_does_not(tmp_path):
     inv = make_inv(tmp_path)
     inv.add(OwnedDisc.from_db_record(MAKO3, date_added="2026-07-12"))
