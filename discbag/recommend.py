@@ -154,14 +154,12 @@ class DiscScore:
     internal: float    # raw selection score (lower = better) used for ranking
 
 
-def score_disc(disc, role, goal="coverage", profile=None, today=None, situation=None):
+def score_disc(disc, role, goal="coverage", profile=None, today=None):
     """Explainable score of a disc for a role under a goal: components + total."""
     fit = roles.fit_score(disc, role)
     components = [ScoreComponent("Role fit", round(100 - fit * _POINT_SCALE))]
     for label, value in _goal_components(goal, disc, profile, today):
         components.append(ScoreComponent(label, round(-value * _POINT_SCALE)))
-    # Scenarios only narrow which roles are built; they don't adjust per-disc score.
-    components.append(ScoreComponent("Scenario adjustment", 0))
     total = sum(c.points for c in components)
     internal = fit + _goal_penalty(goal, disc, profile, today)
     return DiscScore(disc=disc, role=role, components=components, total=total, internal=internal)

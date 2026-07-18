@@ -174,7 +174,6 @@ def test_development_breakdown_names_its_parts():
                              goal="development", profile=prof)
     labels = {c.label for c in s.components}
     assert "Power mismatch" in labels
-    assert "Scenario adjustment" in labels
 
 
 def test_goal_penalty_still_equals_sum_of_components():

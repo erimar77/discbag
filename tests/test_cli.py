@@ -795,3 +795,13 @@ def test_parser_rejects_bad_date_and_count():
         parser.parse_args(["round-used", "mako3", "--date", "not-a-date"])
     with pytest.raises(SystemExit):
         parser.parse_args(["practice", "--count", "-1"])
+
+
+def test_score_has_no_scenario_component(tmp_path, capsys):
+    from discbag import recommend, roles
+    from discbag.inventory import Disc
+    disc = Disc(name="Buzzz", brand="Discraft", category="Midrange",
+                speed=5, glide=4, turn=-1, fade=1)
+    role = roles.primary_role(disc)
+    scored = recommend.score_disc(disc, role)
+    assert not any("Scenario" in c.label for c in scored.components)

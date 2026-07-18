@@ -907,7 +907,7 @@ def cmd_score(args, inv):
             print(f"Couldn't find '{name}' in your bag or the database.")
             return 1
         role = pinned or roles.primary_role(disc)
-        scores.append(recommend.score_disc(disc, role, args.goal, profile, today, args.situation))
+        scores.append(recommend.score_disc(disc, role, args.goal, profile, today))
 
     scores.sort(key=lambda s: s.internal)
     print(f"Goal: {args.goal}" + (f"   Role: {pinned.name}" if pinned else "") + "\n")
@@ -1709,9 +1709,8 @@ def build_parser():
     p_score.add_argument("discs", nargs="+")
     p_score.add_argument("--goal", choices=_GOALS, default="coverage")
     p_score.add_argument("--role", help="score all discs against this role (default: each disc's own)")
-    p_score.add_argument("--situation", choices=_SITUATIONS)
     p_score.add_argument("--verbose", "-v", action="store_true", help="show the score breakdown")
-    p_score.set_defaults(func=cmd_score, situation=None)
+    p_score.set_defaults(func=cmd_score)
 
     p_rec = sub.add_parser("recommend",
                            help="assess bag coverage; suggest discs for missing roles")
