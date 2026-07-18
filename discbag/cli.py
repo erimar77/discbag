@@ -800,6 +800,11 @@ def cmd_build_bag(args, inv):
         print("\nRoles to fill:")
         for role in result.gaps:
             print(f"  {role.name:<22} {role.use}")
+
+    if result.omitted:
+        print("\nLeft out to fit the size limit:")
+        for role in result.omitted:
+            print(f"  {role.name:<22} {role.use}")
     return 0
 
 

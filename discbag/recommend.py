@@ -18,7 +18,7 @@ worse disc.
 """
 
 import random
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 
 from discbag import player, roles
@@ -59,8 +59,9 @@ class RoleFill:
 
 @dataclass
 class BagResult:
-    filled: list   # RoleFill, in role-priority order
-    gaps: list     # roles.Role left unfilled
+    filled: list             # RoleFill, in role-priority order
+    gaps: list                # roles.Role with no qualifying disc
+    omitted: list = field(default_factory=list)   # roles trimmed only to honor --size
 
 
 def _stability(disc):
@@ -202,13 +203,14 @@ def build_bag(bag, size=None, situation=None, goal="coverage",
         used.add(id(pick))
         fills.append(RoleFill(role, pick, roles.fit_score(pick, role)))
 
+    omitted = []
     if size is not None:
         kept = sorted(fills, key=lambda f: f.score)[:size]
-        kept_names = {f.role.name for f in kept}
+        kept_ids = {id(f) for f in kept}
+        omitted = [f.role for f in fills if id(f) not in kept_ids]
         fills = sorted(kept, key=lambda f: f.role.priority)
-        gaps = [r for r in wanted if r.name not in kept_names]
 
-    return BagResult(filled=fills, gaps=gaps)
+    return BagResult(filled=fills, gaps=gaps, omitted=omitted)
 
 
 @dataclass

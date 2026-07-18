@@ -767,6 +767,19 @@ def test_build_bag_still_uses_full_inventory(tmp_path, capsys):
     assert "Destroyer" in out                         # still considered for planning
 
 
+def test_cmd_build_bag_labels_size_omissions_separately(tmp_path, capsys):
+    from discbag import inventory
+    inv = inventory.Inventory(path=tmp_path / "inventory.json")
+    for mold, sp, tu, fa in [("Mako3", 5, 0, 0), ("Wizard", 2, 0, 2),
+                             ("Leopard", 6, -2, 1), ("Firebird", 9, 0, 4)]:
+        inv.add(OwnedDisc.from_db_record(
+            {"name": mold, "brand": "Innova", "category": "x",
+             "speed": sp, "glide": 5, "turn": tu, "fade": fa, "stability": ""}))
+    cli.cmd_build_bag(_ns(size=1, situation=None, goal="coverage", rotate=False), inv)
+    out = capsys.readouterr().out
+    assert "Left out to fit" in out
+
+
 def test_choose_empty_carry_bag_message(tmp_path, capsys):
     inv = _bag_with(tmp_path, ("Mako3", 5, 0, 0))
     inv.set_in_bag("mako3", False)                     # nothing carried

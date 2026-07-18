@@ -49,6 +49,22 @@ def test_build_bag_size_limits_fills():
     assert len(result.filled) == 2
 
 
+def test_build_bag_size_separates_omitted_from_gaps():
+    bag = [MAKO3, WIZARD, LEOPARD, FIREBIRD, DESTROYER]
+    genuine = {r.name for r in recommend.build_bag(bag).gaps}   # no-size genuine gaps
+    result = recommend.build_bag(bag, size=1)
+    assert len(result.filled) == 1
+    omitted = {r.name for r in result.omitted}
+    assert omitted                                              # some roles were trimmed
+    assert omitted.isdisjoint(genuine)                         # trimmed != genuine gaps
+    assert {r.name for r in result.gaps} == genuine            # gaps unchanged by size
+
+
+def test_build_bag_no_size_has_empty_omitted():
+    result = recommend.build_bag([MAKO3, WIZARD])
+    assert result.omitted == []
+
+
 def test_build_bag_situation_narrows_roles():
     result = recommend.build_bag([WIZARD], situation="minimal")
     all_roles = {f.role.name for f in result.filled} | {r.name for r in result.gaps}
