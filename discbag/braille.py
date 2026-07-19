@@ -50,6 +50,7 @@ def flight_scatter(discs, width=60, height=32):
     """A Braille scatter of the bag: stability (x) vs speed (y, fast at top)."""
     if not discs:
         return "Your bag is empty — add discs with: discbag add <name>"
+    discs = [d for d in discs if roles.flight_known(d)]
 
     canvas = Canvas(width, height)
     for d in discs:

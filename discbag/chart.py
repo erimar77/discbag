@@ -89,6 +89,7 @@ def _render_brands(discs):
 
 
 def _render_stability(discs):
+    discs = [d for d in discs if roles.flight_known(d)]
     buckets = [
         ("Very understable", lambda s: s <= -3),
         ("Understable", lambda s: -3 < s <= -1),
@@ -102,6 +103,7 @@ def _render_stability(discs):
 
 
 def _render_flight(discs):
+    discs = [d for d in discs if roles.flight_known(d)]
     label_w = max(len(name) for name, _, _ in _BANDS)
     rows_by_band = {name: [" "] * _WIDTH for name, _, _ in _BANDS}
     for d in discs:

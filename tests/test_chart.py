@@ -80,3 +80,17 @@ def test_stability_chart_shows_distribution():
 
 def test_unknown_kind_falls_back_to_flight():
     assert chart.render(BAG, kind="flight") == chart.render(BAG)
+
+
+# ---------- Unknown-flight discs ----------
+
+def test_stability_chart_skips_unknown_flight():
+    unknown = Disc(name="Comanche", brand="Gateway", speed=10)   # glide/turn/fade None
+    out = chart.render(BAG + [unknown], kind="stability")
+    assert "Comanche" not in out
+
+
+def test_grid_chart_skips_unknown_flight():
+    unknown = Disc(name="Comanche", brand="Gateway", speed=10)
+    out = chart.render(BAG + [unknown], kind="grid")
+    assert "Comanche" not in out

@@ -157,6 +157,7 @@ def _broad_category(disc):
 
 
 def _by_category(active):
+    active = [d for d in active if roles.flight_known(d)]     # speed-derived banding
     groups = {}
     for d in active:
         groups.setdefault(_broad_category(d), []).append(d)
@@ -277,6 +278,7 @@ def _dominant(labels, share):
 def observed_preferences(active):
     """Grounded tendencies, phrased as observations. Empty when nothing is clear."""
     out = []
+    active = [d for d in active if roles.flight_known(d)]
 
     groups = [_stability_group(d) for d in active]
     lean = _dominant(groups, PREF_SHARE)

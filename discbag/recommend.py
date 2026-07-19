@@ -187,6 +187,7 @@ def build_bag(bag, size=None, situation=None, goal="coverage",
     preferred for one role but may cover a second if nothing else qualifies.
     `size` keeps only the best-fitting N fills. `rotate` varies among comparable discs.
     """
+    bag = [d for d in bag if roles.flight_known(d)]
     wanted = roles.roles_for_situation(situation)
     used = set()
     fills, gaps = [], []
@@ -226,6 +227,7 @@ def build_bag_explained(bag, situation=None, goal="coverage", rotate=False,
                         profile=None, rng=None, today=None):
     """Like build_bag, but returns a RoleDecision per role: the ranked candidates,
     the comparable group, the selection, and whether rotation was involved."""
+    bag = [d for d in bag if roles.flight_known(d)]
     wanted = roles.roles_for_situation(situation)
     used = set()
     decisions = []

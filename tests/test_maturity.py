@@ -232,3 +232,15 @@ def test_preferences_speed_cluster_only_when_clustered():
     assert any("speed" in s for s in maturity.observed_preferences(clustered))
     spread = [owned(f"s{i}", speed=s) for i, s in enumerate([2, 5, 8, 11, 13])]
     assert not any("speed" in s for s in maturity.observed_preferences(spread))
+
+
+# ---------- Unknown-flight discs ----------
+
+def test_maturity_flight_signals_skip_unknown():
+    # An Unknown-flight disc doesn't crash maturity and isn't counted in flight-derived signals.
+    from discbag.inventory import OwnedDisc
+    unknown = OwnedDisc.from_db_record({"name": "Comanche", "brand": "Gateway", "category": "",
+                                        "speed": 10, "glide": None, "turn": None, "fade": None,
+                                        "stability": ""})
+    prefs = maturity.observed_preferences([unknown])
+    assert prefs == []                                     # no stability/speed claim from Unknown

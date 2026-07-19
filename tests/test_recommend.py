@@ -212,3 +212,14 @@ def test_build_bag_explained_reports_selection_and_rotation():
     assert len(mid.comparable) == 2       # both are comparable straight mids
     assert mid.rotated is True            # rng picked the non-top candidate
     assert [c.disc.name for c in mid.candidates]  # ranked candidates present
+
+
+# ---------- Unknown-flight discs ----------
+
+def test_build_bag_ignores_unknown_flight():
+    from discbag.inventory import Disc
+    known = Disc(name="Wraith", brand="Innova", category="Distance Driver",
+                 speed=11, glide=5, turn=-1, fade=3)
+    unknown = Disc(name="Comanche", brand="Gateway", speed=10)
+    result = recommend.build_bag([known, unknown])
+    assert all(f.disc is not unknown for f in result.filled)

@@ -43,3 +43,10 @@ def test_flight_scatter_includes_axes_and_legend():
     assert "Wizard" in out and "Destroyer" in out
     # Contains braille block characters.
     assert any(0x2800 <= ord(ch) <= 0x28FF for ch in out)
+
+
+def test_flight_scatter_skips_unknown_flight():
+    known = Disc(name="Wizard", brand="Gateway", speed=2, glide=3, turn=0, fade=2)
+    unknown = Disc(name="Comanche", brand="Gateway", speed=10)   # glide/turn/fade None
+    out = braille.flight_scatter([known, unknown])
+    assert "Comanche" not in out
