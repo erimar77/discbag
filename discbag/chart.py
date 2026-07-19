@@ -72,7 +72,10 @@ def _histogram(title, pairs, note=""):
 
 
 def _render_speed(discs):
-    counts = Counter(int(round(float(d.speed))) for d in discs)
+    discs = [d for d in discs if roles.flight_known(d)]     # reason on effective (personal-aware) flight
+    counts = Counter(int(round(roles.effective_flight(d).speed)) for d in discs)
+    if not counts:
+        return _histogram("Speed distribution", [])
     pairs = [(s, counts.get(s, 0)) for s in range(min(counts), max(counts) + 1)]
     return _histogram("Speed distribution", pairs)
 

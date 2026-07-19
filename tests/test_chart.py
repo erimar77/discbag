@@ -61,6 +61,18 @@ def test_speed_chart_is_a_histogram_with_counts():
     assert "#" in out  # bars
 
 
+def test_speed_chart_handles_personal_complete_prototype():
+    # A manufacturer-incomplete disc with complete personal_flight must not crash the
+    # speed histogram (it participates via its personal speed).
+    from discbag.inventory import OwnedDisc
+    proto = OwnedDisc.from_db_record({"name": "Comanche", "brand": "Gateway", "category": "",
+                                      "speed": None, "glide": None, "turn": None, "fade": None,
+                                      "stability": ""})
+    proto.user.personal_flight = {"speed": 10, "glide": 5, "turn": -1, "fade": 2}
+    out = chart.render(list(BAG) + [proto], kind="speed")     # must not raise
+    assert "speed" in out.lower()
+
+
 def test_composition_chart_breaks_down_by_category():
     out = chart.render(BAG, kind="composition")
     assert "Putter" in out
