@@ -906,3 +906,24 @@ def test_resolve_not_found_message_says_inventory(tmp_path, capsys):
     assert rc == 1
     err = capsys.readouterr().err.lower()
     assert "inventory" in err and "in your bag" not in err
+
+
+def test_flight_str_renders_unknown():
+    from discbag.inventory import Disc
+    assert cli.flight_str(Disc(name="C", brand="Gateway", speed=10)) == "10 / ? / ? / ?"
+
+
+def test_show_prototype_displays_provenance_and_pending_flight(tmp_path, capsys):
+    from discbag import inventory
+    inv = inventory.Inventory(path=tmp_path / "inventory.json")
+    rec = {"name": "Comanche", "brand": "Gateway", "category": "",
+           "speed": 10, "glide": None, "turn": None, "fade": None, "stability": "",
+           "release_status": "prototype", "origin": "local", "program": "Premier Membership",
+           "release": "2026-07", "manufacturer_notes": ["Excellent resistance to turn"]}
+    inv.add(OwnedDisc.from_db_record(rec, plastic="NXTG / NXT Lite Blend"))
+    cli.cmd_show(_ns(name=["comanche"]), inv)
+    out = capsys.readouterr().out
+    assert "Prototype" in out
+    assert "Premier Membership" in out and "2026-07" in out
+    assert "Excellent resistance to turn" in out
+    assert "not yet published" in out.lower() or "?" in out

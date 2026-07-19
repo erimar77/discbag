@@ -67,9 +67,14 @@ def _num_str(value):
     return str(int(f)) if f == int(f) else str(f)
 
 
+def _num_or_q(v):
+    return "?" if v is None else _num_str(v)
+
+
 def flight_str(disc):
-    """Speed / glide / turn / fade, e.g. '6 / 5 / -2 / 1'."""
-    return " / ".join(_num_str(v) for v in (disc.speed, disc.glide, disc.turn, disc.fade))
+    """Speed / glide / turn / fade, e.g. '6 / 5 / -2 / 1'. Unpublished components
+    (None) render as '?' rather than crashing — a prototype may have partial flight."""
+    return " / ".join(_num_or_q(v) for v in (disc.speed, disc.glide, disc.turn, disc.fade))
 
 
 def parse_flight(text):
@@ -118,6 +123,8 @@ def _print_disc_row(disc):
         notes.append("out of bag")
     if u and u.damaged:
         notes.append("damaged")                      # worn but (if active) still carried
+    if getattr(getattr(disc, "cached", None), "release_status", "production") != "production":
+        notes.append("prototype")
     out = f" ({', '.join(notes)})" if notes else ""
     print(f"  {disc.brand} {disc.name}{plastic}{star}{out}".rstrip())
     role = f"  ·  {u.role}" if u and u.role else ""
@@ -128,7 +135,8 @@ def _print_disc_row(disc):
 def format_owned(disc, profile=None):
     """Render an owned disc: manufacturer facts plus this physical disc's user data."""
     plastic = f" [{disc.plastic}]" if disc.plastic else ""
-    lines = [f"{disc.brand} {disc.name}{plastic}"]
+    badge = " (Prototype)" if disc.cached.release_status != "production" else ""
+    lines = [f"{disc.brand} {disc.name}{plastic}{badge}"]
 
     u = disc.user
     user_rows = [
@@ -143,13 +151,21 @@ def format_owned(disc, profile=None):
         ("Last used", u.last_used[:10] if u.last_used else ""),
         ("Tags", ", ".join(u.tags) if u.tags else ""),
         ("Favorite", "yes" if u.favorite else ""),
+        ("Edition", u.edition),
     ]
     for label, value in user_rows:
         if value:
             lines.append(f"  {label + ':':<11}{value}")
 
     lines.append("")
-    lines.append(f"  Flight:    {flight_str(disc)}  (speed/glide/turn/fade, manufacturer)")
+    if not disc.cached.has_flight:
+        known = [f"{label} {_num_str(v)}" for label, v in
+                 (("speed", disc.speed), ("glide", disc.glide),
+                  ("turn", disc.turn), ("fade", disc.fade)) if v is not None]
+        extra = f"  ({', '.join(known)} known)" if known else ""
+        lines.append(f"  Flight:    not yet published{extra}")
+    else:
+        lines.append(f"  Flight:    {flight_str(disc)}  (speed/glide/turn/fade, manufacturer)")
     pf = u.personal_flight
     if pf:
         nums = " / ".join(_num_str(pf[k]) for k in ("speed", "glide", "turn", "fade"))
@@ -160,22 +176,29 @@ def format_owned(disc, profile=None):
             extra.append("★" * int(pf["confidence"]))
         suffix = f"  ({', '.join(extra)})" if extra else ""
         lines.append(f"  Personal:  {nums}{suffix}")
+    if disc.cached.program:
+        release = f" ({disc.cached.release})" if disc.cached.release else ""
+        lines.append(f"  Program:   {disc.cached.program}{release}")
+    if disc.cached.manufacturer_notes:
+        lines.append("  Manufacturer:")
+        for note in disc.cached.manufacturer_notes:
+            lines.append(f"    {note}")
     lines.append(f"  Category:  {disc.category}")
     lines.append(f"  Stability: {disc.stability}")
-    role = u.role or _auto_role(disc)
+    role = u.role or (_auto_role(disc) if roles.flight_known(disc) else "")
     if role:
         lines.append(f"  Role:      {role}")
 
-    level, est = player.power_level(disc)
-    dist, _ = player.recommended_distance(disc)
-    tag = " (estimated)" if est else ""
-    lines.append(f"  Power:     {level}{tag}, ~{dist}+ ft")
-    if profile is not None and not profile.is_empty():
-        from discbag import roles
-        f = roles.behaves_flight(disc, profile)
-        word = roles.stability_word(f.turn + f.fade)
-        nums = " / ".join(_num_str(round(v, 1)) for v in (f.speed, f.glide, f.turn, f.fade))
-        lines.append(f"  For you:   plays {word}  ({nums})")
+    if roles.flight_known(disc):
+        level, est = player.power_level(disc)
+        dist, _ = player.recommended_distance(disc)
+        tag = " (estimated)" if est else ""
+        lines.append(f"  Power:     {level}{tag}, ~{dist}+ ft")
+        if profile is not None and not profile.is_empty():
+            f = roles.behaves_flight(disc, profile)
+            word = roles.stability_word(f.turn + f.fade)
+            nums = " / ".join(_num_str(round(v, 1)) for v in (f.speed, f.glide, f.turn, f.fade))
+            lines.append(f"  For you:   plays {word}  ({nums})")
 
     if u.notes:
         lines.append(f"  Notes:     {u.notes}")
