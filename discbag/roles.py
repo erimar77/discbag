@@ -19,6 +19,21 @@ from dataclasses import dataclass
 from discbag import player
 
 
+def _personal_complete(disc):
+    p = getattr(getattr(disc, "user", None), "personal_flight", None)
+    return bool(p) and all(p.get(k) is not None for k in ("speed", "glide", "turn", "fade"))
+
+
+def _manufacturer_complete(disc):
+    return all(getattr(disc, k, None) is not None for k in ("speed", "glide", "turn", "fade"))
+
+
+def flight_known(disc):
+    """Complete flight to reason with: the player's personal_flight, or the mold's published
+    numbers. Works on OwnedDisc (delegates to its cached snapshot) and on a bare Disc."""
+    return _personal_complete(disc) or _manufacturer_complete(disc)
+
+
 def stability_number(disc):
     """A single overall-stability number: turn + fade (negative = understable)."""
     return float(disc.turn) + float(disc.fade)

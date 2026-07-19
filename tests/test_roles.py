@@ -179,3 +179,29 @@ def test_stability_word_thresholds():
     assert roles.stability_word(0) == "neutral"
     assert roles.stability_word(2) == "overstable"
     assert roles.stability_word(3) == "very overstable"
+
+
+# ---------- flight_known ----------
+
+def test_flight_known_manufacturer_complete():
+    from discbag.inventory import Disc
+    assert roles.flight_known(Disc(name="B", speed=5, glide=4, turn=-1, fade=1)) is True
+    assert roles.flight_known(Disc(name="C", speed=10)) is False        # glide/turn/fade None
+
+
+def test_flight_known_via_personal(tmp_path):
+    from discbag.inventory import OwnedDisc
+    rec = {"name": "Comanche", "brand": "Gateway", "category": "",
+           "speed": 10, "glide": None, "turn": None, "fade": None, "stability": ""}
+    d = OwnedDisc.from_db_record(rec)
+    assert roles.flight_known(d) is False
+    d.user.personal_flight = {"speed": 10, "glide": 5, "turn": -1, "fade": 2}
+    assert roles.flight_known(d) is True                                # personal completes it
+
+
+def test_personal_incomplete_does_not_satisfy():
+    from discbag.inventory import OwnedDisc
+    d = OwnedDisc.from_db_record({"name": "X", "brand": "Y", "speed": None,
+                                  "glide": None, "turn": None, "fade": None, "stability": ""})
+    d.user.personal_flight = {"speed": 10}                              # partial
+    assert roles.flight_known(d) is False
