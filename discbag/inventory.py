@@ -630,7 +630,9 @@ class Inventory:
 
     def update_metadata(self, disc, *, brand=None, mold=None, plastic=None,
                         weight=None, color=None, condition=None, notes=None,
-                        db_discs=None):
+                        speed=None, glide=None, turn=None, fade=None,
+                        release_status=None, program=None, release=None,
+                        manufacturer_note=None, db_discs=None):
         """Correct one physical disc's inventory metadata in place (the `edit`
         command). Overwrites only the fields passed — ``None`` means leave
         unchanged. Never logs a history event: metadata correction is not part
@@ -644,6 +646,14 @@ class Inventory:
         ``(identity_changed, matched_record_or_None)`` so the CLI can report the
         lookup outcome. On no DB match the identity strings are still applied and
         the cached snapshot is left untouched.
+
+        ``speed``/``glide``/``turn``/``fade``/``release_status``/``program``/
+        ``release``/``manufacturer_note`` correct the cached mold snapshot directly
+        — this is how a prototype's partial flight gets filled in as the
+        manufacturer publishes more numbers. Applied *after* any DB-triggered
+        refresh above, so an explicit edit always wins over a stale DB record.
+        ``manufacturer_note`` entries are appended to the existing notes, not
+        replaced.
         """
         from discbag import db
 
@@ -673,6 +683,24 @@ class Inventory:
             if best is not None:
                 disc.cached = Disc.from_db_record(best)
                 matched = best
+
+        c = disc.cached
+        if speed is not None:
+            c.speed = speed
+        if glide is not None:
+            c.glide = glide
+        if turn is not None:
+            c.turn = turn
+        if fade is not None:
+            c.fade = fade
+        if release_status is not None:
+            c.release_status = release_status
+        if program is not None:
+            c.program = program
+        if release is not None:
+            c.release = release
+        if manufacturer_note:
+            c.manufacturer_notes = list(c.manufacturer_notes or []) + list(manufacturer_note)
 
         self._save()
         return identity_changed, matched

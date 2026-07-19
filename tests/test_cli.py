@@ -927,3 +927,57 @@ def test_show_prototype_displays_provenance_and_pending_flight(tmp_path, capsys)
     assert "Premier Membership" in out and "2026-07" in out
     assert "Excellent resistance to turn" in out
     assert "not yet published" in out.lower() or "?" in out
+
+
+def test_add_prototype_authors_local_mold_with_partial_flight(tmp_path, capsys):
+    from discbag import inventory
+    inv = inventory.Inventory(path=tmp_path / "inventory.json")
+    args = _ns(query=["Comanche"], brand="Gateway", prototype=True,
+               speed=10, glide=None, turn=None, fade=None, flight=None, category=None,
+               plastic="NXTG / NXT Lite Blend", weight=None, color=None, condition=None,
+               location=None, notes=None, edition=None, program="Premier Membership",
+               release="2026-07",
+               manufacturer_note=["Excellent resistance to turn", "Long forward push"], yes=True)
+    rc = cli.cmd_add(args, inv)
+    assert rc == 0
+    d = inv.all_discs()[0]
+    assert d.cached.release_status == "prototype" and d.cached.origin == "local"
+    assert d.cached.speed == 10 and d.cached.turn is None      # partial, not zeroed
+    assert d.cached.program == "Premier Membership"
+    assert d.cached.manufacturer_notes == ["Excellent resistance to turn", "Long forward push"]
+    assert d.user.plastic == "NXTG / NXT Lite Blend"
+
+
+def test_iso_month_validator():
+    import argparse, pytest
+    assert cli._iso_month("2026-07") == "2026-07"
+    for bad in ("2026-7", "202607", "2026-13", "2026-07-03"):
+        with pytest.raises(argparse.ArgumentTypeError):
+            cli._iso_month(bad)
+
+
+def test_parser_rejects_bad_release_status():
+    import pytest
+    parser = cli.build_parser()
+    with pytest.raises(SystemExit):
+        parser.parse_args(["edit", "comanche", "--release-status", "bogus"])
+
+
+def test_add_prototype_rejects_decorated_name(tmp_path, capsys):
+    from discbag import inventory
+    inv = inventory.Inventory(path=tmp_path / "inventory.json")
+    for bad in ("Comanche Prototype", "Comanche (Prototype)", "Comanche 2026-07"):
+        rc = cli.cmd_add(_ns(query=[bad], brand="Gateway", prototype=True, speed=10,
+                             glide=None, turn=None, fade=None, flight=None, category=None,
+                             plastic=None, weight=None, color=None, condition=None,
+                             location=None, notes=None, edition=None, program=None,
+                             release=None, manufacturer_note=None, yes=True), inv)
+        assert rc == 1
+    assert inv.all_discs() == []                        # nothing authored
+    # A canonical name (incl. a legitimate space + "OS") is accepted.
+    ok = cli.cmd_add(_ns(query=["Wizard OS"], brand="Gateway", prototype=True,
+                         speed=3, glide=3, turn=0, fade=2.5, flight=None, category="Putter",
+                         plastic=None, weight=None, color=None, condition=None, location=None,
+                         notes=None, edition=None, program=None, release=None,
+                         manufacturer_note=None, yes=True), inv)
+    assert ok == 0 and inv.all_discs()[0].mold == "Wizard OS"

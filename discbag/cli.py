@@ -6,7 +6,7 @@ import sys
 from datetime import date, datetime, timezone
 
 from discbag import db, history, player, roles
-from discbag.inventory import Disc, Inventory, OwnedDisc
+from discbag.inventory import Disc, Inventory, OwnedDisc, UserData
 
 
 # ---------- argparse validators ----------
@@ -34,6 +34,19 @@ def _iso_date(s):
         date.fromisoformat(s)
     except (TypeError, ValueError):
         raise argparse.ArgumentTypeError("must be a date in YYYY-MM-DD form")
+    return s
+
+
+def _iso_month(s):
+    """argparse type: a month in YYYY-MM form (returns the original string).
+
+    Strict on format — unlike `_iso_date`, there's no stdlib parser to lean on, so
+    the month range is checked by hand."""
+    if not re.fullmatch(r"\d{4}-\d{2}", str(s)):
+        raise argparse.ArgumentTypeError("must be a month in YYYY-MM form")
+    month = int(str(s)[5:7])
+    if not (1 <= month <= 12):
+        raise argparse.ArgumentTypeError("must be a month in YYYY-MM form")
     return s
 
 
@@ -77,6 +90,11 @@ def flight_str(disc):
     return " / ".join(_num_or_q(v) for v in (disc.speed, disc.glide, disc.turn, disc.fade))
 
 
+def _speed_key(disc):
+    """Sort key by speed; an unpublished speed (None) sorts last rather than crashing."""
+    return float("inf") if disc.speed is None else float(disc.speed)
+
+
 def parse_flight(text):
     """Parse 'speed/glide/turn/fade' into a dict, or None if malformed."""
     parts = [p.strip() for p in str(text).replace(",", "/").split("/") if p.strip()]
@@ -87,6 +105,18 @@ def parse_flight(text):
     except (TypeError, ValueError):
         return None
     return {"speed": speed, "glide": glide, "turn": turn, "fade": fade}
+
+
+_RELEASE_DATE_TOKEN = re.compile(r"\d{4}-\d{2}")
+
+
+def _is_decorated_mold_name(name):
+    """A locally-authored mold name must be the canonical mold only — no plastic
+    run, no "Prototype" suffix, no release-date token. Deterministic and cheap:
+    we reject "prototype" (case-insensitive) or a YYYY-MM date token, and
+    deliberately do NOT try to detect plastic names (an unbounded, ever-growing
+    vocabulary that would risk false positives on a legitimate mold name)."""
+    return "prototype" in name.lower() or bool(_RELEASE_DATE_TOKEN.search(name))
 
 
 def humanize_age(last_updated, now_iso=None):
@@ -234,6 +264,10 @@ def cmd_dbinfo(args, inv):
 
 def cmd_add(args, inv):
     query = " ".join(args.query).strip()
+
+    if getattr(args, "prototype", False):
+        return _cmd_add_prototype(args, inv, query)
+
     data = db.load_db()
     best, alts = db.find_disc(query, data.get("discs", []))
 
@@ -271,6 +305,51 @@ def cmd_add(args, inv):
     inv.add(disc)
     plastic = f" in {disc.plastic}" if disc.plastic else ""
     print(f"Added {disc.brand} {disc.name}{plastic} to your bag.")
+    return 0
+
+
+def _cmd_add_prototype(args, inv, query):
+    """Author a local prototype mold directly, without a DB match: manufacturer
+    hasn't published it, so there is nothing to look up. Flight fields left
+    unset stay None (unknown), never coerced to 0."""
+    mold_name = query
+    if not mold_name:
+        print("Name the disc, e.g. 'discbag add Comanche --prototype --brand Gateway'.",
+              file=sys.stderr)
+        return 1
+    if _is_decorated_mold_name(mold_name):
+        print(f"'{mold_name}' looks like it bakes in a plastic/date/'Prototype' "
+              "marker. Use the canonical mold name only — plastic goes in "
+              "--plastic, release timing in --program/--release.", file=sys.stderr)
+        return 1
+
+    if args.flight:
+        flight = parse_flight(args.flight)
+        if flight is None:
+            print("Flight numbers must look like 6/5/-1/2 (speed/glide/turn/fade).",
+                  file=sys.stderr)
+            return 1
+    else:
+        flight = {"speed": args.speed, "glide": args.glide,
+                  "turn": args.turn, "fade": args.fade}
+
+    mold = Disc(name=mold_name, brand=args.brand or "", category=args.category or "",
+               speed=flight["speed"], glide=flight["glide"],
+               turn=flight["turn"], fade=flight["fade"],
+               release_status="prototype", origin="local",
+               program=args.program, release=args.release,
+               manufacturer_notes=list(args.manufacturer_note or []))
+
+    today = datetime.now(timezone.utc).date().isoformat()
+    user = UserData(plastic=args.plastic or "", weight=args.weight, color=args.color or "",
+                    notes=args.notes or "", condition=args.condition or "",
+                    purchase_location=args.location or "", date_added=today,
+                    edition=args.edition or "")
+    disc = OwnedDisc(brand=mold.brand, mold=mold.name, cached=mold, user=user)
+    inv.add(disc)
+    plastic = f" in {disc.plastic}" if disc.plastic else ""
+    print(f"Authored prototype {disc.brand} {disc.name}{plastic} — not in the database "
+          "(local, unpublished).")
     return 0
 
 
@@ -527,6 +606,14 @@ def cmd_edit(args, inv):
         "color": args.color,
         "condition": args.condition,
         "notes": args.notes,
+        "speed": getattr(args, "speed", None),
+        "glide": getattr(args, "glide", None),
+        "turn": getattr(args, "turn", None),
+        "fade": getattr(args, "fade", None),
+        "release_status": getattr(args, "release_status", None),
+        "program": getattr(args, "program", None),
+        "release": getattr(args, "release", None),
+        "manufacturer_note": getattr(args, "manufacturer_note", None),
     }
     if all(v is None for v in edits.values()):
         print("Nothing to edit — pass at least one field, e.g. --plastic Champion.",
@@ -612,7 +699,7 @@ def cmd_list(args, inv):
         filters["include_archived"] = True
     # filter() defaults to active-only, so an empty filter set still hides archived discs.
     narrowed = any(k in filters for k in ("tag", "favorite", "in_bag", "status"))
-    discs = sorted(inv.filter(**filters), key=lambda d: float(d.speed))
+    discs = sorted(inv.filter(**filters), key=_speed_key)
     if not discs:
         where = " matching that filter" if narrowed else ""
         print(f"No discs{where}." if narrowed else
@@ -701,7 +788,7 @@ def cmd_favorite(args, inv):
 
 def cmd_bag(args, inv):
     if args.action == "list":
-        discs = sorted(inv.filter(in_bag=True), key=lambda d: float(d.speed))
+        discs = sorted(inv.filter(in_bag=True), key=_speed_key)
         if not discs:
             print("No discs currently in the bag. Add with: discbag bag add <name>")
             return 0
@@ -1605,6 +1692,22 @@ def build_parser():
     p_add.add_argument("--location", help="where you bought it")
     p_add.add_argument("--notes")
     p_add.add_argument("--yes", action="store_true", help="accept the best match without prompting")
+    p_add.add_argument("--edition", help="a limited-run edition/stamp, stored as metadata")
+    p_add.add_argument("--prototype", action="store_true",
+                       help="author a local, unpublished mold instead of looking it up "
+                            "in the database (a manufacturer prototype you own)")
+    p_add.add_argument("--brand", help="manufacturer, for --prototype")
+    p_add.add_argument("--category", help="Putter/Midrange/Fairway/Distance, for --prototype")
+    p_add.add_argument("--speed", type=float, help="for --prototype: leave unset if unpublished")
+    p_add.add_argument("--glide", type=float, help="for --prototype: leave unset if unpublished")
+    p_add.add_argument("--turn", type=float, help="for --prototype: leave unset if unpublished")
+    p_add.add_argument("--fade", type=float, help="for --prototype: leave unset if unpublished")
+    p_add.add_argument("--flight", help="for --prototype: speed/glide/turn/fade all at once, "
+                                        "e.g. 10/5/-1/2 — an alternative to individual flags")
+    p_add.add_argument("--program", help="for --prototype: e.g. 'Premier Membership'")
+    p_add.add_argument("--release", type=_iso_month, help="for --prototype: expected release, YYYY-MM")
+    p_add.add_argument("--manufacturer-note", dest="manufacturer_note", action="append",
+                       help="for --prototype: a manufacturer-provided note (repeatable)")
     p_add.set_defaults(func=cmd_add)
 
     _ARCHIVE_STATUSES = ["retired", "lost", "sold", "gifted", "broken"]
@@ -1665,6 +1768,17 @@ def build_parser():
     p_edit.add_argument("--color")
     p_edit.add_argument("--condition", help="e.g. New, Used, Beat-in")
     p_edit.add_argument("--notes")
+    p_edit.add_argument("--speed", type=float, help="correct/fill in the published speed")
+    p_edit.add_argument("--glide", type=float, help="correct/fill in the published glide")
+    p_edit.add_argument("--turn", type=float, help="correct/fill in the published turn")
+    p_edit.add_argument("--fade", type=float, help="correct/fill in the published fade")
+    p_edit.add_argument("--release-status", dest="release_status",
+                        choices=["production", "prototype"],
+                        help="e.g. once a prototype ships: --release-status production")
+    p_edit.add_argument("--program", help="e.g. 'Premier Membership'")
+    p_edit.add_argument("--release", type=_iso_month, help="expected/actual release, YYYY-MM")
+    p_edit.add_argument("--manufacturer-note", dest="manufacturer_note", action="append",
+                        help="append a manufacturer-provided note (repeatable)")
     p_edit.set_defaults(func=cmd_edit)
 
     p_hist = sub.add_parser("history", help="a disc's full story, even after it leaves the bag")
