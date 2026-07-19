@@ -171,3 +171,39 @@ def test_verdict_three_plus_is_degraded_note():
     assert "Most distinct:" in v
     # Wave & Wraith are the closest pair; Firebird the most distinct.
     assert "Wave" in v and "Wraith" in v and "Firebird" in v
+
+
+# ---------- Unknown-flight discs ----------
+
+def test_choose_excludes_unknown_flight():
+    known = Disc(name="Wraith", brand="Innova", category="Distance Driver",
+                 speed=11, glide=5, turn=-1, fade=3)
+    unknown = Disc(name="Comanche", brand="Gateway", speed=10)   # glide/turn/fade None
+    picks = analysis.choose([known, unknown], distance=300, shape="straight")
+    assert all(p.disc is not unknown for p in picks)
+
+
+def test_overlap_excludes_unknown_flight():
+    a = Disc(name="Buzzz", brand="Discraft", category="Midrange", speed=5, glide=4, turn=-1, fade=1)
+    b = Disc(name="Buzzz2", brand="Discraft", category="Midrange", speed=5, glide=4, turn=-1, fade=1)
+    unknown = Disc(name="Comanche", brand="Gateway", speed=10)
+    groups = analysis.overlap([a, b, unknown])
+    flat = [d for g in groups for d in g]
+    assert unknown not in flat
+
+
+def test_compare_renders_dash_for_unknown_flight():
+    known = Disc(name="Wraith", brand="Innova", category="Distance Driver",
+                 speed=11, glide=5, turn=-1, fade=3)
+    unknown = Disc(name="Comanche", brand="Gateway", speed=10)
+    table = analysis.compare([known, unknown])
+    rows = {r.label: r.values for r in table.rows}
+    assert rows["Glide"][1] == "—" and rows["Turn"][1] == "—"      # Unknown disc → dashes
+    assert rows["Speed"][1] == 10                                    # a known field still shows
+
+
+def test_compare_verdict_skipped_when_a_disc_is_unknown():
+    known = Disc(name="Wraith", brand="Innova", category="Distance Driver",
+                 speed=11, glide=5, turn=-1, fade=3)
+    unknown = Disc(name="Comanche", brand="Gateway", speed=10)
+    assert analysis.compare_verdict([known, unknown]) is None       # can't reason without flight

@@ -38,6 +38,7 @@ def overlap(discs, threshold=OVERLAP_THRESHOLD, profile=None):
     With a profile, two discs overlap when they *behave* the same for the player,
     not just when their manufacturer numbers match.
     """
+    discs = [d for d in discs if roles.flight_known(d)]
     n = len(discs)
     parent = list(range(n))
     flights = [roles.behaves_flight(d, profile) for d in discs]
@@ -78,19 +79,25 @@ def _role_of(disc):
     user = getattr(disc, "user", None)
     if user is not None and user.role:
         return user.role
+    if not roles.flight_known(disc):
+        return "—"
     return roles.primary_role(disc).name
+
+
+def _cell(v):
+    return "—" if v is None else v
 
 
 def compare(discs):
     """A side-by-side table of flight numbers and expected role for each disc."""
     headers = [d.name for d in discs]
     rows = [
-        Row("Speed", [d.speed for d in discs]),
-        Row("Glide", [d.glide for d in discs]),
-        Row("Turn", [d.turn for d in discs]),
-        Row("Fade", [d.fade for d in discs]),
-        Row("Stability",
-            [roles.stability_word(roles.stability_number(d)) for d in discs]),
+        Row("Speed", [_cell(d.speed) for d in discs]),
+        Row("Glide", [_cell(d.glide) for d in discs]),
+        Row("Turn", [_cell(d.turn) for d in discs]),
+        Row("Fade", [_cell(d.fade) for d in discs]),
+        Row("Stability", [(roles.stability_word(s) if (s := roles.stability_number(d)) is not None
+                           else "—") for d in discs]),
         Row("Role", [_role_of(d) for d in discs]),
     ]
     return Table(headers=headers, rows=rows)
@@ -181,6 +188,8 @@ def compare_verdict(discs):
     discs; a one-line degraded note for 3+; None for fewer than two."""
     if len(discs) < 2:
         return None
+    if not all(roles.flight_known(d) for d in discs):
+        return None
     if len(discs) > 2:
         return _degraded_note(discs)
     a, b = discs
@@ -238,6 +247,7 @@ def _shot_score(flight, target):
 
 def choose(bag, distance=None, wind=None, shape=None, profile=None):
     """Rank discs for a shot, using how each flies *for this player*."""
+    bag = [d for d in bag if roles.flight_known(d)]
     target = _shot_target(distance, wind, shape)
     picks = [Pick(disc=d, score=_shot_score(roles.behaves_flight(d, profile), target))
              for d in bag]
@@ -254,4 +264,5 @@ def _practice_score(flight):
 
 def practice(bag, count=3, profile=None):
     """The most form-friendly discs in the bag (straight, neutral, controllable)."""
+    bag = [d for d in bag if roles.flight_known(d)]
     return sorted(bag, key=lambda d: _practice_score(roles.behaves_flight(d, profile)))[:count]
