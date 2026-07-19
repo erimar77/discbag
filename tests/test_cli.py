@@ -1007,3 +1007,64 @@ def test_choose_notes_excluded_prototypes(tmp_path, capsys):
     cli.cmd_choose(_ns(distance=300, wind=None, shape="straight"), inv)
     out = capsys.readouterr().out.lower()
     assert "not considered" in out and "flight" in out
+
+
+UNKNOWN_PROTOTYPE = {"name": "Comanche", "brand": "Gateway", "category": "",
+                     "speed": None, "glide": None, "turn": None, "fade": None,
+                     "stability": "", "release_status": "prototype", "origin": "local"}
+
+
+def test_score_skips_unknown_flight_prototype_and_still_scores_the_rest(tmp_path, capsys, monkeypatch):
+    from discbag import inventory
+    monkeypatch.setattr(cli.db, "load_db", lambda: {"discs": []})
+    inv = inventory.Inventory(path=tmp_path / "inventory.json")
+    inv.add(OwnedDisc.from_db_record(UNKNOWN_PROTOTYPE))
+    inv.add(OwnedDisc.from_db_record(MAKO3))
+    rc = cli.cmd_score(_ns(discs=["comanche", "mako3"], goal="coverage",
+                           role=None, verbose=False), inv)
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "Gateway Comanche: flight not yet published — can't score." in out
+    assert "Mako3" in out                            # the scorable disc was still scored
+
+
+def test_score_all_unknown_flight_returns_cleanly(tmp_path, capsys, monkeypatch):
+    from discbag import inventory
+    monkeypatch.setattr(cli.db, "load_db", lambda: {"discs": []})
+    inv = inventory.Inventory(path=tmp_path / "inventory.json")
+    inv.add(OwnedDisc.from_db_record(UNKNOWN_PROTOTYPE))
+    rc = cli.cmd_score(_ns(discs=["comanche"], goal="coverage",
+                           role=None, verbose=False), inv)
+    assert rc == 0
+    assert "flight not yet published" in capsys.readouterr().out.lower()
+
+
+def test_explain_role_skips_unknown_flight_prototype_in_inventory(tmp_path, capsys):
+    from discbag import inventory
+    inv = inventory.Inventory(path=tmp_path / "inventory.json")
+    inv.add(OwnedDisc.from_db_record(UNKNOWN_PROTOTYPE))
+    rc = cli.cmd_explain(_ns(what="role", rest=["Putting"], goal="coverage"), inv)
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "No owned disc qualifies for this role." in out
+
+
+def test_show_personal_complete_prototype_omits_power_line(tmp_path, capsys):
+    from discbag import inventory
+    inv = inventory.Inventory(path=tmp_path / "inventory.json")
+    disc = OwnedDisc.from_db_record(UNKNOWN_PROTOTYPE)
+    disc.user.personal_flight = {"speed": 10, "glide": 5, "turn": -1, "fade": 2}
+    inv.add(disc)
+    rc = cli.cmd_show(_ns(name=["comanche"]), inv)
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "For you" in out                          # personal flight is shown
+    assert "Power:" not in out                        # manufacturer flight still unpublished
+
+
+def test_show_manufacturer_complete_disc_still_shows_power_line(tmp_path, capsys):
+    inv = _inv_with_mako(tmp_path)
+    rc = cli.cmd_show(_ns(name=["mako3"]), inv)
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "Power:" in out                            # regression: unaffected by the fix

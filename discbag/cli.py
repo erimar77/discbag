@@ -220,10 +220,11 @@ def format_owned(disc, profile=None):
         lines.append(f"  Role:      {role}")
 
     if roles.flight_known(disc):
-        level, est = player.power_level(disc)
-        dist, _ = player.recommended_distance(disc)
-        tag = " (estimated)" if est else ""
-        lines.append(f"  Power:     {level}{tag}, ~{dist}+ ft")
+        if disc.cached.has_flight:
+            level, est = player.power_level(disc)
+            dist, _ = player.recommended_distance(disc)
+            tag = " (estimated)" if est else ""
+            lines.append(f"  Power:     {level}{tag}, ~{dist}+ ft")
         if profile is not None and not profile.is_empty():
             f = roles.behaves_flight(disc, profile)
             word = roles.stability_word(f.turn + f.fade)
@@ -991,7 +992,8 @@ def cmd_explain(args, inv):
             return 1
         goal = args.goal
         candidates = sorted((recommend.score_disc(d, role, goal, profile, today)
-                             for d in inv.list_discs() if roles.qualifies(d, role)),
+                             for d in inv.list_discs()
+                             if roles.flight_known(d) and roles.qualifies(d, role)),
                             key=lambda s: s.internal)
         print(f"{role.name}\n")
         if profile is not None:
@@ -1066,6 +1068,9 @@ def cmd_score(args, inv):
         if disc is None:
             print(f"Couldn't find '{name}' in your inventory or the database.")
             return 1
+        if not roles.flight_known(disc):
+            print(f"{disc.brand} {disc.name}: flight not yet published — can't score.")
+            continue
         role = pinned or roles.primary_role(disc)
         scores.append(recommend.score_disc(disc, role, args.goal, profile, today))
 
