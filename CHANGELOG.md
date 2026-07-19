@@ -7,6 +7,15 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- Prototype / partially-known molds. `add --prototype` authors a **local mold** that isn't in the
+  catalog — a manufacturer prototype you own — with whatever flight numbers have been published so
+  far (partial flight stays genuinely unknown, never zeroed). Record the maker's own claims with
+  repeatable `--manufacturer-note` (kept separate from your personal `--notes`) and the release
+  provenance with `--program`/`--release`. Fill numbers in with `edit` as they're published, and
+  `edit --release-status production` graduates the mold. Incomplete-flight discs are fully tracked
+  (inventory, bag, usage, favorites, history) but sit out flight-based analysis until their flight is
+  complete — either the manufacturer publishes it or you record a personal `flight`. `list
+  --prototype` filters to these molds, and catalog `sync` never overwrites a local mold.
 - `discbag maturity` — a qualitative read of where your collection sits (Discovery / Developing /
   Developed) and why, with grounded usage insights and observed preferences. Answers "do I actually
   need anything?" rather than "what should I buy?"

@@ -171,7 +171,7 @@ The reference mirrors `discbag --help`, which groups commands by purpose: **Comm
 
 ```bash
 discbag add <name> [--plastic --weight --color --condition --location --notes --yes]
-discbag list [--tag <t>] [--favorite] [--in-bag] [--status <s>] [--all] [--ids]
+discbag list [--tag <t>] [--favorite] [--in-bag] [--status <s>] [--all] [--ids] [--prototype]
 discbag show <name>                 # your metadata + flight + role + how it plays for you
 discbag build-bag [--goal coverage|development|confidence|tournament|fun] [--rotate]
                   [--size N | -n N] [--windy|--woods|--rain|--minimal|--travel]
@@ -180,8 +180,11 @@ discbag profile [ ... ]             # show or set your player profile (see below
 ```
 
 `add` looks the disc up in the database and auto-fills its flight numbers; the flags attach your own
-metadata. `list --all` (or `--status lost`) includes archived discs; `list --ids` reveals each disc's
-id. `recommend` reports role coverage with a priority and reason for each; `--next` names the single
+metadata. `add --prototype` instead authors a **local mold** that isn't in the catalog — a
+manufacturer prototype you own — with whatever flight numbers have been published so far (see
+Organization). `list --all` (or `--status lost`) includes archived discs; `list --ids` reveals each
+disc's id; `list --prototype` shows only your unpublished/local molds. `recommend` reports role
+coverage with a priority and reason for each; `--next` names the single
 most valuable purchase, `--gaps` shows only missing roles, and `--per-slot N` sets how many candidate
 discs to suggest (default 3).
 
@@ -252,6 +255,8 @@ discbag favorite <disc> [--unset] [--all]
 discbag tag <disc> <tag> [--all]    # untag <disc> <tag> [--all] to remove
 discbag role <disc> "hyzer flip"    # a personal role label
 discbag edit <name> [--plastic --weight --color --condition --notes --manufacturer --mold]
+                    [--speed --glide --turn --fade]          # fill in numbers as they're published
+                    [--release-status production|prototype --program --release --manufacturer-note]
                     [--id <id>]     # correct metadata in place; never logs a history event
 ```
 
@@ -270,6 +275,26 @@ from a beat one, so it earns its own story.
 `edit` fixes or fills in a disc's metadata after adding it — including a typo in the manufacturer or
 mold, which re-derives the cached flight numbers from the database. Because it's a **correction, not
 an event**, it never touches the disc's history.
+
+**Prototypes and partially-known molds.** Some discs you own aren't in the catalog yet — a
+manufacturer prototype or membership-club release whose flight numbers are only partly published.
+`add --prototype` authors these as **local molds**: give the canonical mold name and brand, plus
+whatever numbers exist so far (`--speed 10` alone is fine; the rest stay genuinely **unknown**, never
+zeroed). Provenance rides along — `--program "Premier Membership"`, `--release 2026-07`, and repeated
+`--manufacturer-note` for the maker's own claims (kept separate from your personal `--notes`). Name a
+mold by its real identity only: `discbag` rejects decorated names like `Comanche Prototype` or
+`Comanche 2026-07`, so the same mold stays one mold as it graduates. As the manufacturer publishes
+more, `edit --speed/--glide/--turn/--fade` fills the numbers in, and `edit --release-status
+production` retires the prototype badge — all without a history event.
+
+Incomplete-flight discs are **fully tracked** — they sit in your inventory and bag, count in usage
+and favorites, and carry their whole history — but they **sit out flight-based analysis** (`choose`,
+`build-bag`, `overlap`, coverage, charts) until their flight is complete, since guessing numbers
+would be dishonest. Two ways complete it: the manufacturer publishes them (`edit`), or you record how
+it actually flies for *you* with `flight` — a complete personal flight makes the disc first-class in
+analysis immediately, using your numbers. `list --prototype` filters to just these molds, and a
+catalog `sync` never overwrites a local mold — your partial specs, provenance, and notes are
+authoritative.
 
 `history` shows a summary followed by the persisted event timeline. For a disc you played a few
 times and later sold, it reads like this (illustrative):
