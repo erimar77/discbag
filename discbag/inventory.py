@@ -13,6 +13,10 @@ snapshot is updated (see ``OwnedDisc.refresh_from_db``).
 import json
 import os
 import uuid
+try:
+    import fcntl
+except ImportError:      # non-POSIX platforms (e.g. Windows) get no cross-process lock
+    fcntl = None
 from dataclasses import asdict, dataclass, field, fields
 from pathlib import Path
 from typing import List, Optional
@@ -23,6 +27,51 @@ def _new_id():
 
 RUNTIME_DIR = Path(os.path.expanduser("~")) / ".discbag"
 RUNTIME_INVENTORY_PATH = RUNTIME_DIR / "inventory.json"
+
+
+# --- cross-process advisory lock ---
+# Two concurrent CLI invocations would each load the whole file, mutate, and write it
+# back — a last-writer-wins race that silently drops one update. An exclusive advisory
+# lock, taken before the load and held until the Inventory is dropped, serializes them:
+# a second process blocks until the first finishes, then reads the first's result. It's
+# reentrant within one process (several Inventory objects on the same path — as in tests
+# — share a single lock) and a best-effort no-op where flock is unavailable or the lock
+# can't be taken (never block a real mutation on it). flock auto-releases if a process
+# dies, so a crash leaves no stale lock.
+_LOCKS = {}      # resolved path str -> [fd, refcount]
+
+
+def _acquire_lock(path):
+    if fcntl is None:
+        return None
+    key = str(Path(path).resolve())
+    entry = _LOCKS.get(key)
+    if entry is not None:
+        entry[1] += 1
+        return key
+    try:
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        fd = os.open(str(path) + ".lock", os.O_CREAT | os.O_RDWR, 0o644)
+        fcntl.flock(fd, fcntl.LOCK_EX)
+    except OSError:
+        return None
+    _LOCKS[key] = [fd, 1]
+    return key
+
+
+def _release_lock(key):
+    entry = _LOCKS.get(key)
+    if entry is None:
+        return
+    entry[1] -= 1
+    if entry[1] <= 0:
+        try:
+            fcntl.flock(entry[0], fcntl.LOCK_UN)
+            os.close(entry[0])
+        except OSError:
+            pass
+        _LOCKS.pop(key, None)
+
 
 # Manufacturer fields carried on a mold snapshot.
 _MOLD_FIELDS = ("name", "brand", "category", "speed", "glide", "turn", "fade", "stability")
@@ -295,7 +344,17 @@ class Inventory:
 
     def __init__(self, path=None):
         self.path = Path(path) if path else RUNTIME_INVENTORY_PATH
+        # Serialize load-modify-save across concurrent processes (see _acquire_lock).
+        self._lock_key = _acquire_lock(self.path)
         self._discs = self._load()
+
+    def __del__(self):
+        try:
+            key = getattr(self, "_lock_key", None)
+            if key is not None:
+                _release_lock(key)
+        except Exception:
+            pass
 
     def _load(self):
         if not self.path.exists():

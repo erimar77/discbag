@@ -212,6 +212,28 @@ def test_restore_returns_disc_to_carry_bag(tmp_path):
     assert inv.filter(in_bag=True)                        # shows up in the carry bag
 
 
+# ---------- cross-process advisory lock ----------
+
+def test_inventory_lock_is_reentrant_same_process(tmp_path):
+    # Two Inventory objects on the same path within one process must NOT deadlock
+    # (they share one reentrant lock). This test hangs if reentrancy is broken.
+    p = tmp_path / "inventory.json"
+    inv1 = inventory.Inventory(path=p)
+    inv1.add(OwnedDisc.from_db_record(MAKO3))
+    inv2 = inventory.Inventory(path=p)
+    assert len(inv2.list_discs()) == 1
+
+
+def test_inventory_lock_released_when_holder_dropped(tmp_path):
+    import gc
+    p = tmp_path / "inventory.json"
+    inv = inventory.Inventory(path=p)
+    key = inv._lock_key
+    del inv
+    gc.collect()
+    assert key not in inventory._LOCKS                     # released once the last holder is gone
+
+
 def test_set_damaged_true_logs_event_false_does_not(tmp_path):
     inv = make_inv(tmp_path)
     inv.add(OwnedDisc.from_db_record(MAKO3, date_added="2026-07-12"))
