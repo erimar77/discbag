@@ -173,6 +173,28 @@ def test_cmd_restore_reactivates(tmp_path, capsys):
     assert [d.name for d in inv.list_discs()] == ["Mako3"]
 
 
+def test_cmd_restore_already_active_logs_no_event(tmp_path, capsys):
+    inv = _inv_with_mako(tmp_path)
+    before = len(inv.all_discs()[0].user.events or [])
+    rc = cli.cmd_restore(_ns(name=["mako3"]), inv)
+    assert rc == 0
+    assert "already active" in capsys.readouterr().out.lower()
+    # No false "Restored" event appended for an already-active disc.
+    assert len(inv.all_discs()[0].user.events or []) == before
+
+
+def test_bag_id_rejects_archived_disc(tmp_path, capsys):
+    from discbag import inventory
+    inv = inventory.Inventory(path=tmp_path / "inventory.json")
+    inv.add(OwnedDisc.from_db_record(MAKO3))
+    d = inv.all_discs()[0]
+    inv.set_status(d, "lost")                       # archived → in_bag False
+    rc = cli.cmd_bag(_ns(action="add", name=[], id=d.id, all=False), inv)
+    assert rc == 1
+    assert "archived" in capsys.readouterr().err.lower()
+    assert inv.all_discs()[0].user.in_bag is False   # not placed in the carry bag
+
+
 def test_cmd_history_reports_status_reason_and_sessions(tmp_path, capsys):
     inv = _inv_with_mako(tmp_path)
     inv.record_use("mako3", "2026-05-01T00:00:00+00:00")

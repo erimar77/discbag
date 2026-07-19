@@ -385,6 +385,9 @@ def cmd_restore(args, inv):
     if targets is None:
         return 1
     disc = targets[0]
+    if disc.user.is_active:
+        print(f"{disc.brand} {disc.name} is already active — nothing to restore.")
+        return 0
     inv.set_status(disc, "active", reason=None, when=_now_iso())
     print(f"Restored {disc.brand} {disc.name} to Active.")
     return 0
@@ -665,6 +668,10 @@ def cmd_bag(args, inv):
         disc = inv.find_by_id(disc_id)
         if disc is None:
             print(f"No disc with id '{disc_id}'.", file=sys.stderr)
+            return 1
+        if not disc.user.is_active:
+            print(f"{disc.brand} {disc.name} is archived — restore it before carrying it.",
+                  file=sys.stderr)
             return 1
         targets = [disc]
     else:
