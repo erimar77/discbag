@@ -118,16 +118,25 @@ def _normalize_use(entry):
 
 @dataclass
 class Disc:
-    """Manufacturer / mold data. Immutable facts sourced from the database."""
+    """Manufacturer / mold data. Immutable facts sourced from a catalog or authored locally."""
 
     name: str
     brand: str = ""
     category: str = ""
-    speed: float = 0
-    glide: float = 0
-    turn: float = 0
-    fade: float = 0
+    speed: Optional[float] = None       # None = not published (distinct from a real 0)
+    glide: Optional[float] = None
+    turn: Optional[float] = None
+    fade: Optional[float] = None
     stability: str = ""
+    release_status: str = "production"  # "production" | "prototype"
+    origin: str = "discit"              # open string: which catalog (or "local")
+    program: Optional[str] = None       # e.g. "Premier Membership"
+    release: Optional[str] = None       # e.g. "2026-07"
+    manufacturer_notes: List[str] = field(default_factory=list)
+
+    @property
+    def has_flight(self):
+        return all(v is not None for v in (self.speed, self.glide, self.turn, self.fade))
 
     @classmethod
     def from_db_record(cls, record):
@@ -154,6 +163,7 @@ class UserData:
     in_bag: bool = True
     tags: List[str] = field(default_factory=list)
     role: str = ""
+    edition: str = ""
     # Lightweight use tracking (not throw-by-throw): a count, the last-used timestamp,
     # and a log of uses. Each log entry is {"date": ..., "session_type": "round"|"practice"};
     # legacy entries are bare timestamp strings and count as rounds.

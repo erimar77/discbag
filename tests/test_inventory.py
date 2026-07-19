@@ -591,3 +591,51 @@ def test_update_metadata_notes_empty_string_clears_none_leaves_unchanged(tmp_pat
     disc = inv.all_discs()[0]
     inv.update_metadata(disc, notes="")
     assert inv.all_discs()[0].user.notes == ""               # "" clears it
+
+
+def test_disc_flight_defaults_to_none_not_zero():
+    d = Disc(name="Comanche", brand="Gateway", speed=10)  # glide/turn/fade omitted
+    assert d.speed == 10
+    assert d.glide is None and d.turn is None and d.fade is None
+    assert d.has_flight is False
+
+
+def test_disc_has_flight_true_when_all_present():
+    d = Disc(name="Buzzz", brand="Discraft", speed=5, glide=4, turn=-1, fade=1)
+    assert d.has_flight is True
+
+
+def test_disc_provenance_defaults_and_roundtrip():
+    d = Disc(name="Comanche", brand="Gateway", speed=10,
+             release_status="prototype", origin="local", program="Premier Membership",
+             release="2026-07", manufacturer_notes=["Excellent resistance to turn"])
+    back = Disc.from_dict(d.to_dict())
+    assert back.release_status == "prototype" and back.origin == "local"
+    assert back.program == "Premier Membership" and back.release == "2026-07"
+    assert back.manufacturer_notes == ["Excellent resistance to turn"]
+    assert back.has_flight is False
+
+
+def test_disc_defaults_are_production_discit():
+    d = Disc(name="Buzzz", brand="Discraft", speed=5, glide=4, turn=-1, fade=1)
+    assert d.release_status == "production" and d.origin == "discit"
+    assert d.manufacturer_notes == []
+
+
+def test_userdata_edition_roundtrips():
+    u = UserData(edition="First Run")
+    assert UserData.from_dict(u.to_dict()).edition == "First Run"
+
+
+def test_old_inventory_json_loads_with_defaults(tmp_path):
+    # A pre-feature record (no new fields) loads with safe defaults, flight intact.
+    path = tmp_path / "inventory.json"
+    rec = OwnedDisc.from_db_record(MAKO3).to_dict()
+    for k in ("release_status", "origin", "program", "release", "manufacturer_notes"):
+        rec["cached"].pop(k, None)
+    rec["user"].pop("edition", None)
+    path.write_text(json.dumps([rec]))
+    d = inventory.Inventory(path=path).list_discs()[0]
+    assert d.cached.release_status == "production" and d.cached.origin == "discit"
+    assert d.user.edition == ""
+    assert d.cached.has_flight is True                       # MAKO3 has full numbers
