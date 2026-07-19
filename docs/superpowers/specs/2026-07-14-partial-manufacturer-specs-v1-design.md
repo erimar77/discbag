@@ -105,8 +105,9 @@ prototype status, release month, plastic, or program (`"Comanche Prototype"`, `"
 This is not cosmetic: discbag joins molds to the catalog by `(brand, mold)`. Canonical naming is
 what lets **v3 graduation** match a local prototype to the finalized DiscItDB entry when it appears
 (`"Gateway"/"Comanche"` local ↔ `"Gateway"/"Comanche"` DB). Decorated names would never match, and
-graduation would be impossible. `add --prototype` therefore validates that the name is a bare mold
-name (rejecting an obvious decoration is a v1 nicety; the principle is documented and tested).
+graduation would be impossible. `add --prototype` therefore rejects a **deterministically** decorated
+name (one containing "prototype" or a `YYYY-MM` token); plastic decoration is documented-not-detected
+(a plastic vocabulary would be unbounded and false-positive-prone).
 
 ### Completeness: derived, not stored
 
@@ -203,11 +204,12 @@ are first-class, marked `origin="local"`.
 
 - **`add` a mold with no DB match** succeeds (see CLI) instead of failing/forcing full manual stats.
 - **`sync` / `refresh_from_db`** (`db.py`, `inventory.refresh_from_db`) refresh **only molds whose
-  `origin` matches the catalog being refreshed.** A DiscIt sync refreshes `origin=="discit"` molds;
-  `origin=="local"` is **never** auto-refreshed (its provenance and partial specs are
-  authoritative); a future catalog (e.g. `origin=="csv"`) would refresh only its own. `refresh_from_db`
-  already no-ops on no name match; v1 adds the explicit origin check so a coincidental same-name DB
-  mold can't clobber a local one (that reconciliation is v3 graduation).
+  `origin` matches the catalog being refreshed.** **v1 implements the DiscItDB refresh only:** it
+  updates `origin=="discit"` molds and **skips every other origin** — `origin=="local"` is never
+  auto-refreshed (its provenance and partial specs are authoritative), and any future catalog is
+  skipped until its own refresh exists. `refresh_from_db` already no-ops on no name match; v1 adds
+  the explicit origin check so a coincidental same-name DB mold can't clobber a local one (that
+  reconciliation is v3 graduation).
 - Existing production discs keep `origin="discit"` and refresh exactly as today.
 
 ---
@@ -314,8 +316,10 @@ Note: 2 prototype disc(s) not considered — flight not yet published.
 ## Validation rules (v1)
 
 - **Identity:** `--brand` and mold name required and non-empty for `--prototype` authoring. The mold
-  name must be canonical — reject an obviously decorated name (containing "prototype", a plastic, or
-  a `YYYY-MM`) so v3 graduation can match by `(brand, mold)`.
+  name must be canonical — reject a **deterministically** decorated name: one containing "prototype"
+  (case-insensitive) or a `\d{4}-\d{2}` release-date token, so v3 graduation can match by
+  `(brand, mold)`. Plastic decoration is **documented as disallowed, not pattern-detected** (detecting
+  plastics needs an unbounded vocabulary and risks false positives on real mold names).
 - **`release_status`** ∈ {`production`, `prototype`} on input (stored strings are otherwise untouched).
 - **Flight flags** each parse as a number if given; any subset may be omitted → `None`. Never coerced
   to `0`. (`--flight S/G/T/F` requires all four.)

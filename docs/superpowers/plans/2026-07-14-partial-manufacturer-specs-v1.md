@@ -223,6 +223,13 @@ def test_stability_number_none_safe():
     from discbag.inventory import Disc
     assert roles.stability_number(Disc(name="C", speed=10)) is None      # incomplete → None
     assert roles.stability_number(Disc(name="B", speed=5, glide=4, turn=-1, fade=1)) == 0.0
+
+
+def test_effective_flight_raises_on_incomplete():
+    import pytest
+    from discbag.inventory import Disc
+    with pytest.raises(ValueError):                                      # never invents zeros
+        roles.effective_flight(Disc(name="C", speed=10))                 # no personal, incomplete
 ```
 
 - [ ] **Step 2 — Run, expect FAIL** (current `stability_number` does `float(None)` → TypeError).
@@ -236,21 +243,31 @@ def test_stability_number_none_safe():
             return None
         return float(disc.turn) + float(disc.fade)
     ```
-  - `roles.effective_flight`: use `personal_flight` only when `_personal_complete`, else the manufacturer numbers; both branches are only reached for `flight_known` discs. Guard the personal branch:
+  - `roles.effective_flight`: use `personal_flight` only when `_personal_complete`, else the
+    manufacturer numbers — and **fail loudly** rather than coerce anything, because callers must only
+    pass `flight_known` discs (Unknown must never become `0`, even accidentally):
     ```python
     def effective_flight(disc):
         if _personal_complete(disc):
             p = disc.user.personal_flight
             return Flight(speed=float(p["speed"]), glide=float(p["glide"]),
                           turn=float(p["turn"]), fade=float(p["fade"]))
-        return Flight(speed=float(disc.speed), glide=float(getattr(disc, "glide", 0) or 0),
+        if not _manufacturer_complete(disc):
+            raise ValueError("effective_flight requires complete flight data")
+        return Flight(speed=float(disc.speed), glide=float(disc.glide),
                       turn=float(disc.turn), fade=float(disc.fade))
     ```
-  - `player.adjusted_numbers`: precondition is `flight_known`; leave as-is (callers guarantee it) but make the read defensive against a `None` glide only:
-    (no change required beyond callers filtering; do not silently coerce `None` speed/turn/fade — those callers must have filtered.)
+  - `player.adjusted_numbers`: precondition is `flight_known`; leave as-is (callers guarantee it).
+    Do **not** add any `None`-coercion — an incomplete disc reaching it is a filtering bug, and it
+    should surface as a loud `TypeError`, not a silently-invented `0`.
 
-- [ ] **Step 4 — Run, expect PASS**; note downstream callers of `stability_number` must handle `None` (done in later tasks). Full suite may still be green here because complete discs are unaffected; if any existing test now hits `None`, it belongs to a later task's filter — if a failure appears, it indicates the caller needs its Task-2.x filter; apply that task first. Expected on this task in isolation: the new test passes and previously-green tests stay green.
-- [ ] **Step 5 — Commit** (`roles.py`, `player.py`, `tests/test_roles.py`): "None-safe stability_number and effective_flight".
+- [ ] **Step 4 — Run, expect PASS**, then full suite `-q` PASS. **This task is self-contained.**
+  Every existing test constructs *complete* discs (Phase 1 / Task 1.1 Step 5 gave any bare-`Disc`
+  fixture explicit numbers), so `stability_number`'s `None` branch and `effective_flight`'s `raise`
+  are exercised *only* by this task's new tests — no existing caller passes an incomplete disc.
+  Incomplete discs reach these functions only in later tasks, each of which adds the filter that
+  keeps them out. So the suite is green here with no deferred caller fixes.
+- [ ] **Step 5 — Commit** (`roles.py`, `player.py`, `tests/test_roles.py`): "None-safe stability_number; effective_flight raises rather than coercing".
 
 ### Task 2.2 — Role coverage filters Unknown (`roles.py`)
 
@@ -486,11 +503,31 @@ def test_iso_month_validator():
             cli._iso_month(bad)
 
 
-def test_parser_rejects_decorated_prototype_name_and_bad_release_status():
-    parser = cli.build_parser()
+def test_parser_rejects_bad_release_status():
     import pytest
+    parser = cli.build_parser()
     with pytest.raises(SystemExit):
         parser.parse_args(["edit", "comanche", "--release-status", "bogus"])
+
+
+def test_add_prototype_rejects_decorated_name(tmp_path, capsys):
+    from discbag import inventory
+    inv = inventory.Inventory(path=tmp_path / "inventory.json")
+    for bad in ("Comanche Prototype", "Comanche (Prototype)", "Comanche 2026-07"):
+        rc = cli.cmd_add(_ns(query=[bad], brand="Gateway", prototype=True, speed=10,
+                             glide=None, turn=None, fade=None, flight=None, category=None,
+                             plastic=None, weight=None, color=None, condition=None,
+                             location=None, notes=None, edition=None, program=None,
+                             release=None, manufacturer_note=None, yes=True), inv)
+        assert rc == 1
+    assert inv.all_discs() == []                        # nothing authored
+    # A canonical name (incl. a legitimate space + "OS") is accepted.
+    ok = cli.cmd_add(_ns(query=["Wizard OS"], brand="Gateway", prototype=True,
+                         speed=3, glide=3, turn=0, fade=2.5, flight=None, category="Putter",
+                         plastic=None, weight=None, color=None, condition=None, location=None,
+                         notes=None, edition=None, program=None, release=None,
+                         manufacturer_note=None, yes=True), inv)
+    assert ok == 0 and inv.all_discs()[0].mold == "Wizard OS"
 ```
 
 - [ ] **Step 2 — Run, expect FAIL.**
@@ -498,7 +535,17 @@ def test_parser_rejects_decorated_prototype_name_and_bad_release_status():
 - [ ] **Step 3 — Implement** in `discbag/cli.py`:
   - Add `_iso_month(s)` validator (strict `^\d{4}-\d{2}$`, month 01–12), mirroring `_iso_date`.
   - Extend the `add` parser (`p_add`): `--prototype` (store_true), `--brand`, `--category`, `--speed/--glide/--turn/--fade` (type `float`), `--flight` (`S/G/T/F`), `--program`, `--release` (type `_iso_month`), `--manufacturer-note` (action append, dest `manufacturer_note`), `--edition`. Keep existing flags.
-  - `cmd_add`: when `args.prototype`, take the **local-authoring** path — build the `Disc` directly from `--brand` + the positional mold name (canonical; reject a decorated name containing "prototype"/a plastic token/`YYYY-MM`) + the provided flight fields (omitted → `None`, from `--flight` if given) + `release_status="prototype"`, `origin="local"`, `program`, `release`, `manufacturer_notes` — **without** requiring a DB match. Then `OwnedDisc.from_db_record`-equivalent construction with the user metadata (`plastic`, `weight`, `edition`, personal `notes`). Non-prototype `add` is unchanged.
+  - `cmd_add`: when `args.prototype`, take the **local-authoring** path — build the `Disc` directly
+    from `--brand` + the positional mold name + the provided flight fields (omitted → `None`, from
+    `--flight` if given) + `release_status="prototype"`, `origin="local"`, `program`, `release`,
+    `manufacturer_notes` — **without** requiring a DB match. Then construct the `OwnedDisc` with the
+    user metadata (`plastic`, `weight`, `edition`, personal `notes`). Non-prototype `add` is unchanged.
+  - **Canonical-name validation (deterministic).** Before authoring, reject a decorated mold name:
+    reject if it contains **"prototype"** (case-insensitive) or a **`\d{4}-\d{2}`** release-date token.
+    Do **not** attempt to detect plastic names — that would require an unbounded, ever-growing
+    vocabulary and risk false positives on a legitimate mold. Plastic-in-the-name is *documented as
+    disallowed* (README), not pattern-matched. `"Comanche"` and `"Wizard OS"` pass; `"Comanche
+    Prototype"`, `"Comanche (Prototype)"`, and `"Comanche 2026-07"` are rejected with exit 1.
   - `edit` parser (`p_edit`): add `--speed/--glide/--turn/--fade`, `--release-status` (choices `["production", "prototype"]`), `--program`, `--release` (`_iso_month`), `--manufacturer-note` (append). `cmd_edit` sets them on the cached snapshot; flight fields fill individual `None`s. (Reuse the existing `update_metadata` path; extend it to carry the manufacturer/flight fields.)
 
 - [ ] **Step 4 — Run, expect PASS**; end-to-end sanity in a temp HOME authoring the three fixtures; full suite `-q` PASS.
@@ -586,14 +633,18 @@ def test_refresh_still_updates_discit_mold(tmp_path):
 
 - [ ] **Step 2 — Run, expect FAIL** (local mold currently gets overwritten / no-op only on name miss).
 
-- [ ] **Step 3 — Implement.** In `OwnedDisc.refresh_from_db(self, db_discs)`, return early when the mold is not catalog-backed:
+- [ ] **Step 3 — Implement.** **v1 implements the DiscItDB refresh only:** it updates
+  `origin=="discit"` molds and skips **every other** origin (`local` and any future catalog). The
+  general "refresh only molds whose `origin` matches the catalog being refreshed" rule generalizes
+  once more catalogs exist; in v1 the only catalog is DiscItDB, so the match is simply `== "discit"`.
+  In `OwnedDisc.refresh_from_db(self, db_discs)`, return early for any non-DiscIt mold:
 ```python
     def refresh_from_db(self, db_discs):
-        if self.cached.origin != "discit":     # local / other-catalog molds are authoritative
+        if self.cached.origin != "discit":     # only DiscItDB molds refresh; everything else is authoritative
             return False
         ... (existing exact-match refresh) ...
 ```
-`refresh_manufacturer`/`sync` call `refresh_from_db` per disc, so this is the single choke point. (Generalization to per-catalog origin matching is v-future; v1 protects `origin != "discit"`.)
+`refresh_manufacturer`/`sync` call `refresh_from_db` per disc, so this early-return is the single choke point.
 
 - [ ] **Step 4 — Run, expect PASS**; full suite `-q` PASS.
 - [ ] **Step 5 — Commit:** "sync never overwrites non-discit (local) molds".
