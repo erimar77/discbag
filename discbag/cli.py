@@ -90,6 +90,17 @@ def flight_str(disc):
     return " / ".join(_num_or_q(v) for v in (disc.speed, disc.glide, disc.turn, disc.fade))
 
 
+def _effective_flight_str(disc):
+    """Flight numbers to *rank by* — personal if recorded, else manufacturer. For a
+    flight_known disc (all that choose/practice surface) this shows real numbers, so a
+    personal-complete prototype reads as its personal flight rather than '? / ? / ? / ?'.
+    Falls back to the raw '?'-aware string for anything not flight_known."""
+    if not roles.flight_known(disc):
+        return flight_str(disc)
+    f = roles.effective_flight(disc)
+    return " / ".join(_num_str(v) for v in (f.speed, f.glide, f.turn, f.fade))
+
+
 def _speed_key(disc):
     """Sort key by speed; an unpublished speed (None) sorts last rather than crashing."""
     return float("inf") if disc.speed is None else float(disc.speed)
@@ -646,7 +657,9 @@ def cmd_edit(args, inv):
             print(f"  Matched: {matched['brand']} {matched['name']} "
                   f"({matched['speed']}/{matched['glide']}/"
                   f"{matched['turn']}/{matched['fade']})")
-        else:
+        elif disc.cached.origin == "discit":
+            # A local mold is authoritative — it's intentionally never resolved
+            # against the catalog, so a "no match" warning would be misleading.
             print("  Warning: no database match for the new identity; flight "
                   "numbers left unchanged. Run 'discbag updatedb' or check the "
                   "spelling.", file=sys.stderr)
@@ -1332,12 +1345,12 @@ def cmd_choose(args, inv):
     print("Recommended")
     for p in picks[:2]:
         d = p.disc
-        print(f"  ✓ {d.brand} {d.name}  ({flight_str(d)})")
+        print(f"  ✓ {d.brand} {d.name}  ({_effective_flight_str(d)})")
     if len(picks) > 2:
         print("\nAlternative")
         for p in picks[2:4]:
             d = p.disc
-            print(f"    {d.brand} {d.name}  ({flight_str(d)})")
+            print(f"    {d.brand} {d.name}  ({_effective_flight_str(d)})")
     note = _excluded_note(candidates)
     if note:
         print(f"\n{note}")
@@ -1356,7 +1369,7 @@ def cmd_practice(args, inv):
         return 0
     print("Today's Practice Recommendation\n")
     for d in picks:
-        print(f"  {d.brand} {d.name}  ({flight_str(d)})")
+        print(f"  {d.brand} {d.name}  ({_effective_flight_str(d)})")
     print("\nReason:\n  Straight, neutral discs expose form issues and reward clean releases.")
     note = _excluded_note(candidates)
     if note:

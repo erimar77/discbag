@@ -97,6 +97,34 @@ def test_refresh_still_updates_discit_mold():
     assert disc.fade == 1                           # discit mold refreshes as before
 
 
+def test_edit_identity_never_rederives_local_mold(tmp_path):
+    # Renaming a local mold must not resolve it against the catalog and clobber its
+    # authored specs / flip its origin — local molds are authoritative. Uses a rename
+    # that would *exactly* match a catalog entry, so only the origin guard prevents it.
+    inv = make_inv(tmp_path)
+    rec = {"name": "Comanche", "brand": "Innova", "category": "",
+           "speed": 10, "glide": None, "turn": None, "fade": None, "stability": "",
+           "release_status": "prototype", "origin": "local",
+           "manufacturer_notes": ["Long forward push"]}
+    inv.add(OwnedDisc.from_db_record(rec))
+    disc = inv.all_discs()[0]
+    inv.update_metadata(disc, mold="Mako3", db_discs=[dict(MAKO3)])   # would match MAKO3 exactly
+    assert disc.cached.origin == "local"            # not flipped to discit
+    assert disc.cached.turn is None                 # authored partial specs preserved
+    assert disc.cached.manufacturer_notes == ["Long forward push"]
+    assert disc.mold == "Mako3"                     # the rename itself still applies
+
+
+def test_edit_identity_still_rederives_discit_mold(tmp_path):
+    inv = make_inv(tmp_path)
+    inv.add(OwnedDisc.from_db_record(MAKO3))         # origin defaults "discit"
+    disc = inv.all_discs()[0]
+    wraith = {"name": "Wraith", "brand": "Innova", "category": "Distance Driver",
+              "speed": 11, "glide": 5, "turn": -1, "fade": 3, "stability": ""}
+    inv.update_metadata(disc, mold="Wraith", db_discs=[wraith])
+    assert disc.cached.speed == 11                   # discit mold re-derives on rename as before
+
+
 # ---------- Inventory ----------
 
 def test_add_and_list(tmp_path):

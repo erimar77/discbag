@@ -629,6 +629,23 @@ def test_cmd_edit_identity_change_no_match_warns_on_stderr(tmp_path, capsys, mon
     assert "no database match" in capsys.readouterr().err.lower()
 
 
+def test_cmd_edit_renaming_local_mold_does_not_warn(tmp_path, capsys, monkeypatch):
+    # A local mold is authoritative and intentionally never resolved against the
+    # catalog, so renaming it must not emit the misleading "no database match" warning.
+    from discbag import inventory
+    monkeypatch.setattr(cli.db, "load_db", lambda: {"discs": [dict(MAKO3)]})
+    inv = inventory.Inventory(path=tmp_path / "inventory.json")
+    inv.add(OwnedDisc.from_db_record(
+        {"name": "Comanche", "brand": "Innova", "category": "",
+         "speed": 10, "glide": None, "turn": None, "fade": None, "stability": "",
+         "release_status": "prototype", "origin": "local"}))
+    rc = cli.cmd_edit(_edit_ns(name=["comanche"], mold="Comanche II"), inv)
+    assert rc == 0
+    assert inv.all_discs()[0].mold == "Comanche II"
+    assert inv.all_discs()[0].cached.origin == "local"      # unchanged
+    assert "no database match" not in capsys.readouterr().err.lower()
+
+
 WAVE = {"name": "Wave", "brand": "MVP", "category": "Distance Driver",
         "speed": 11, "glide": 5, "turn": -2, "fade": 2, "stability": ""}
 WRAITH = {"name": "Wraith", "brand": "Innova", "category": "Distance Driver",
@@ -836,6 +853,20 @@ def test_cmd_build_bag_empty_inventory_stops(tmp_path, capsys):
     assert "no discs yet" in out.lower()
     assert "Recommended bag" not in out          # doesn't fall through on an empty inventory
     assert rc == 0
+
+
+def test_choose_shows_personal_numbers_for_personal_complete_prototype(tmp_path, capsys):
+    # A manufacturer-incomplete disc with a complete personal_flight ranks via its
+    # personal numbers, so the display must show them — not raw "? / ? / ? / ?".
+    from tests.conftest import prototype_disc
+    from discbag import inventory
+    inv = inventory.Inventory(path=tmp_path / "inventory.json")
+    inv.add(prototype_disc())                          # personal 10/5/-1/2, manufacturer None
+    cli.cmd_choose(_ns(distance=300, wind=None, shape="straight"), inv)
+    out = capsys.readouterr().out
+    assert "Comanche" in out
+    assert "10 / 5 / -1 / 2" in out                    # personal numbers rendered
+    assert "?" not in out                              # never the raw-manufacturer placeholder
 
 
 def test_choose_empty_carry_bag_message(tmp_path, capsys):

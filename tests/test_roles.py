@@ -135,6 +135,15 @@ def test_suggest_excludes_owned_molds():
     assert picks == []
 
 
+def test_suggest_ignores_incomplete_flight_catalog_discs():
+    # A catalog can carry a mold whose flight didn't parse (db.update_db writes None).
+    # suggest must skip it, not crash on effective_flight/qualifies.
+    incomplete = Disc(name="Mystery", brand="Gateway", speed=9)   # glide/turn/fade None
+    picks = roles.suggest(role("Utility driver"), owned=[], catalog=[FIREBIRD, incomplete], n=5)
+    names = [p.disc.name for p in picks]
+    assert "Firebird" in names and "Mystery" not in names
+
+
 def test_best_next_picks_highest_priority_missing_role():
     # Bag with only a straight mid -> putting (priority 1) is the top missing role.
     catalog = [WIZARD, FIREBIRD]

@@ -297,7 +297,8 @@ def suggest(role, owned, catalog, n=3, profile=None, preferred_only=False):
     preferred = _preferred_brands(profile)
 
     candidates = [d for d in catalog
-                  if qualifies(d, role) and d.name.strip().lower() not in owned_names]
+                  if flight_known(d) and qualifies(d, role)
+                  and d.name.strip().lower() not in owned_names]
     if preferred_only and preferred:
         candidates = [d for d in candidates
                       if str(getattr(d, "brand", "")).strip().lower() in preferred]

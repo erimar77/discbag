@@ -684,7 +684,10 @@ class Inventory:
             u.notes = notes
 
         matched = None
-        if identity_changed and db_discs is not None:
+        # Only DiscItDB molds re-derive from the catalog on a rename; a local mold is
+        # authoritative and must never be resolved against (and overwritten by) the
+        # catalog — mirrors refresh_from_db's origin guard.
+        if identity_changed and db_discs is not None and disc.cached.origin == "discit":
             best, _ = db.find_disc(f"{disc.brand} {disc.mold}", db_discs)
             if best is not None:
                 disc.cached = Disc.from_db_record(best)
