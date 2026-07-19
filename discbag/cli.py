@@ -697,15 +697,18 @@ def cmd_list(args, inv):
         filters["status"] = args.status
     elif getattr(args, "all", False):
         filters["include_archived"] = True
+    prototype_only = getattr(args, "prototype", False)
     # filter() defaults to active-only, so an empty filter set still hides archived discs.
-    narrowed = any(k in filters for k in ("tag", "favorite", "in_bag", "status"))
+    narrowed = any(k in filters for k in ("tag", "favorite", "in_bag", "status")) or prototype_only
     discs = sorted(inv.filter(**filters), key=_speed_key)
+    if prototype_only:
+        discs = [d for d in discs if d.cached.release_status != "production"]
     if not discs:
         where = " matching that filter" if narrowed else ""
         print(f"No discs{where}." if narrowed else
               "You have no discs yet. Add one with: discbag add <name>")
         return 0
-    label = "matching" if narrowed else "discs"
+    label = "prototypes" if prototype_only else ("matching" if narrowed else "discs")
     print(f"Your inventory ({len(discs)} {label}):\n")
     show_ids = getattr(args, "ids", False)
     for d in discs:
@@ -953,6 +956,10 @@ def cmd_build_bag(args, inv):
         print("\nLeft out to fit the size limit:")
         for role in result.omitted:
             print(f"  {role.name:<22} {role.use}")
+
+    note = _excluded_note(discs)
+    if note:
+        print(f"\n{note}")
     return 0
 
 
@@ -1287,14 +1294,27 @@ def cmd_compare(args, inv):
     return 0
 
 
+def _excluded_note(candidates):
+    """A trailing footnote when some candidates couldn't be reasoned about: a
+    prototype (or any mold) whose flight isn't fully known yet. None if all were
+    considered."""
+    excluded = [d for d in candidates if not roles.flight_known(d)]
+    if not excluded:
+        return None
+    word = "disc" if len(excluded) == 1 else "discs"
+    return f"Note: {len(excluded)} {word} not considered — flight not yet published."
+
+
 def cmd_choose(args, inv):
     from discbag import analysis
     prof = player.load_profile()
-    picks = analysis.choose(inv.filter(in_bag=True), distance=args.distance,
+    candidates = inv.filter(in_bag=True)
+    picks = analysis.choose(candidates, distance=args.distance,
                             wind=args.wind, shape=args.shape,
                             profile=None if prof.is_empty() else prof)
     if not picks:
-        print("No discs in your bag. Put discs in with: discbag bag add <name>")
+        note = _excluded_note(candidates)
+        print(note or "No discs in your bag. Put discs in with: discbag bag add <name>")
         return 0
     parts = []
     if args.distance:
@@ -1313,21 +1333,29 @@ def cmd_choose(args, inv):
         for p in picks[2:4]:
             d = p.disc
             print(f"    {d.brand} {d.name}  ({flight_str(d)})")
+    note = _excluded_note(candidates)
+    if note:
+        print(f"\n{note}")
     return 0
 
 
 def cmd_practice(args, inv):
     from discbag import analysis
     prof = player.load_profile()
-    picks = analysis.practice(inv.filter(in_bag=True), count=args.count,
+    candidates = inv.filter(in_bag=True)
+    picks = analysis.practice(candidates, count=args.count,
                               profile=None if prof.is_empty() else prof)
     if not picks:
-        print("No discs in your bag. Put discs in with: discbag bag add <name>")
+        note = _excluded_note(candidates)
+        print(note or "No discs in your bag. Put discs in with: discbag bag add <name>")
         return 0
     print("Today's Practice Recommendation\n")
     for d in picks:
         print(f"  {d.brand} {d.name}  ({flight_str(d)})")
     print("\nReason:\n  Straight, neutral discs expose form issues and reward clean releases.")
+    note = _excluded_note(candidates)
+    if note:
+        print(f"\n{note}")
     return 0
 
 
@@ -1796,6 +1824,8 @@ def build_parser():
                         help="include archived discs (lost, sold, retired, …)")
     p_list.add_argument("--ids", action="store_true",
                         help="show each disc's internal id (for 'edit --id')")
+    p_list.add_argument("--prototype", action="store_true",
+                        help="only unpublished/local prototype molds")
     p_list.set_defaults(func=cmd_list)
 
     p_show = sub.add_parser("show", help="show details for a disc in your bag")

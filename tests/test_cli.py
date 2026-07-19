@@ -981,3 +981,29 @@ def test_add_prototype_rejects_decorated_name(tmp_path, capsys):
                          notes=None, edition=None, program=None, release=None,
                          manufacturer_note=None, yes=True), inv)
     assert ok == 0 and inv.all_discs()[0].mold == "Wizard OS"
+
+
+def test_list_prototype_filters(tmp_path, capsys):
+    from discbag import inventory
+    inv = inventory.Inventory(path=tmp_path / "inventory.json")
+    inv.add(OwnedDisc.from_db_record(MAKO3))
+    inv.add(OwnedDisc.from_db_record({"name": "Comanche", "brand": "Gateway", "category": "",
+             "speed": 10, "glide": None, "turn": None, "fade": None, "stability": "",
+             "release_status": "prototype", "origin": "local"}))
+    cli.cmd_list(_ns(tag=None, favorite=False, in_bag=False, status=None, all=False,
+                     ids=False, prototype=True), inv)
+    out = capsys.readouterr().out
+    assert "Comanche" in out and "Mako3" not in out
+
+
+def test_choose_notes_excluded_prototypes(tmp_path, capsys):
+    from discbag import inventory
+    inv = inventory.Inventory(path=tmp_path / "inventory.json")
+    inv.add(OwnedDisc.from_db_record({"name": "Wraith", "brand": "Innova",
+             "category": "Distance Driver", "speed": 11, "glide": 5, "turn": -1, "fade": 3}))
+    inv.add(OwnedDisc.from_db_record({"name": "Comanche", "brand": "Gateway", "category": "",
+             "speed": 10, "glide": None, "turn": None, "fade": None, "stability": "",
+             "release_status": "prototype"}))
+    cli.cmd_choose(_ns(distance=300, wind=None, shape="straight"), inv)
+    out = capsys.readouterr().out.lower()
+    assert "not considered" in out and "flight" in out
