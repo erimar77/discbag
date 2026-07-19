@@ -244,3 +244,31 @@ def test_maturity_flight_signals_skip_unknown():
                                         "stability": ""})
     prefs = maturity.observed_preferences([unknown])
     assert prefs == []                                     # no stability/speed claim from Unknown
+
+
+# ---------- manufacturer-incomplete + personal-complete prototypes ----------
+
+def test_broad_category_uses_effective_flight_for_prototype():
+    from tests.conftest import prototype_disc
+    d = prototype_disc()   # personal speed=10 -> driver band; raw d.speed is None
+    assert maturity._broad_category(d) == "driver"
+
+
+def test_stability_group_uses_effective_flight_for_prototype():
+    from tests.conftest import prototype_disc
+    d = prototype_disc()   # personal turn=-1, fade=2 -> stability 1 -> neutral
+    assert maturity._stability_group(d) == "neutral"
+
+
+def test_observed_preferences_prototype_reasons_on_personal_numbers():
+    from tests.conftest import prototype_disc
+    d = prototype_disc()
+    out = maturity.observed_preferences([d])
+    assert any("neutral" in s.lower() for s in out)
+
+
+def test_usage_insights_prototype_does_not_crash():
+    from tests.conftest import prototype_disc
+    d = prototype_disc()
+    out = maturity.usage_insights([d], TODAY)
+    assert out == []   # no usage recorded yet, but no crash either

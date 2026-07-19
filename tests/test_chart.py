@@ -94,3 +94,42 @@ def test_grid_chart_skips_unknown_flight():
     unknown = Disc(name="Comanche", brand="Gateway", speed=10)
     out = chart.render(BAG + [unknown], kind="grid")
     assert "Comanche" not in out
+
+
+# ---------- manufacturer-incomplete + personal-complete prototypes ----------
+
+def test_stability_uses_effective_flight_for_prototype():
+    from tests.conftest import prototype_disc
+    d = prototype_disc()   # personal turn=-1, fade=2 -> stability 1
+    assert chart.stability(d) == 1
+
+
+def test_grid_renders_prototype_via_personal_numbers_without_crashing():
+    from tests.conftest import prototype_disc
+    d = prototype_disc()   # raw d.speed/glide/turn/fade are all None
+    out = chart.render([d], kind="grid")
+    assert "Comanche" in out
+    assert "10/5/-1/2" in out          # personal numbers, not raw manufacturer None
+    assert "stability +1" in out
+
+
+def test_default_braille_chart_renders_prototype_without_crashing():
+    from tests.conftest import prototype_disc
+    d = prototype_disc()
+    out = chart.render([d])
+    assert "Comanche" in out
+
+
+def test_stability_chart_includes_prototype_without_crashing():
+    from tests.conftest import prototype_disc
+    d = prototype_disc()
+    out = chart.render([d], kind="stability")
+    assert "overstable" in out.lower()   # doesn't crash; still renders the buckets
+
+
+def test_grid_shows_manufacturer_numbers_for_complete_disc_regression():
+    # Regression guard: a manufacturer-complete disc with no personal_flight is
+    # byte-for-byte unchanged since effective flight == manufacturer flight.
+    out = chart.render([UNDERSTABLE], kind="grid")
+    assert "9/5/-4/1" in out
+    assert chart.stability(NEUTRAL) == 0

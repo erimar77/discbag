@@ -18,8 +18,9 @@ _STAB_MIN, _STAB_MAX = -5, 5
 
 
 def stability(disc):
-    """A single overall-stability number: turn + fade (negative = understable)."""
-    return roles.stability_number(disc)
+    """A single overall-stability number: turn + fade (negative = understable),
+    on the disc's effective flight (personal if recorded, else manufacturer)."""
+    return roles.effective_stability(disc)
 
 
 def _col(stab):
@@ -30,7 +31,7 @@ def _col(stab):
 
 
 def _band_for(disc):
-    spd = float(disc.speed)
+    spd = roles.effective_flight(disc).speed
     for name, lo, hi in _BANDS:
         if lo <= spd <= hi:
             return name
@@ -124,11 +125,12 @@ def _render_flight(discs):
 
     lines.append("")
     lines.append("Discs:")
-    for d in sorted(discs, key=lambda x: (-float(x.speed), stability(x))):
+    for d in sorted(discs, key=lambda x: (-roles.effective_flight(x).speed, stability(x))):
         stab = stability(d)
         sign = f"+{stab:g}" if stab > 0 else f"{stab:g}"
         brand = f"{d.brand} " if d.brand else ""
-        nums = f"{_g(d.speed)}/{_g(d.glide)}/{_g(d.turn)}/{_g(d.fade)}"
+        f = roles.effective_flight(d)
+        nums = f"{_g(f.speed)}/{_g(f.glide)}/{_g(f.turn)}/{_g(f.fade)}"
         lines.append(f"  {d.name[0].upper()}  {brand}{d.name}  ({nums}, stability {sign})")
     return "\n".join(lines)
 

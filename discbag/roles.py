@@ -155,6 +155,14 @@ def effective_flight(disc):
                   turn=float(disc.turn), fade=float(disc.fade))
 
 
+def effective_stability(disc):
+    """turn + fade on the disc's effective flight (personal if recorded, else
+    manufacturer). Callers must only pass `flight_known` discs — same contract as
+    `effective_flight`, which this delegates to."""
+    f = effective_flight(disc)
+    return f.turn + f.fade
+
+
 def behaves_flight(disc, profile=None):
     """How the disc flies for this player: personal numbers if recorded, else the
     player-power-adjusted manufacturer numbers (or raw numbers with no profile)."""

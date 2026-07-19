@@ -188,7 +188,7 @@ def compare_verdict(discs):
     discs; a one-line degraded note for 3+; None for fewer than two."""
     if len(discs) < 2:
         return None
-    if not all(roles.flight_known(d) for d in discs):
+    if not all(roles._manufacturer_complete(d) for d in discs):
         return None
     if len(discs) > 2:
         return _degraded_note(discs)

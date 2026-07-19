@@ -50,3 +50,20 @@ def test_flight_scatter_skips_unknown_flight():
     unknown = Disc(name="Comanche", brand="Gateway", speed=10)   # glide/turn/fade None
     out = braille.flight_scatter([known, unknown])
     assert "Comanche" not in out
+
+
+# ---------- manufacturer-incomplete + personal-complete prototypes ----------
+
+def test_flight_scatter_prototype_uses_personal_numbers_without_crashing():
+    from tests.conftest import prototype_disc
+    d = prototype_disc()   # raw d.speed/glide/turn/fade are all None
+    out = braille.flight_scatter([d])
+    assert "Comanche" in out
+    assert "10/5/-1/2" in out          # personal numbers, not raw manufacturer None
+
+
+def test_flight_scatter_manufacturer_complete_disc_regression():
+    # Regression guard: unchanged for a manufacturer-complete disc with no personal_flight.
+    known = Disc(name="Wizard", brand="Gateway", speed=2, glide=3, turn=0, fade=2)
+    out = braille.flight_scatter([known])
+    assert "2/3/0/2" in out

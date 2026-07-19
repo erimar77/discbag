@@ -223,3 +223,14 @@ def test_build_bag_ignores_unknown_flight():
     unknown = Disc(name="Comanche", brand="Gateway", speed=10)
     result = recommend.build_bag([known, unknown])
     assert all(f.disc is not unknown for f in result.filled)
+
+
+# ---------- manufacturer-incomplete + personal-complete prototypes ----------
+
+def test_build_bag_development_goal_handles_prototype_without_crashing():
+    from tests.conftest import prototype_disc
+    d = prototype_disc()   # personal speed=10 glide=5 turn=-1 fade=2 -> qualifies Control fairway
+    prof = PlayerProfile(max_distance=200)   # weaker arm than the prototype needs
+    result = recommend.build_bag([d], goal="development", profile=prof)
+    filled = {f.role.name: f.disc for f in result.filled}
+    assert filled.get("Control fairway") is d

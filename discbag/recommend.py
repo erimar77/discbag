@@ -65,7 +65,7 @@ class BagResult:
 
 
 def _stability(disc):
-    return roles.stability_number(disc)
+    return roles.effective_stability(disc)
 
 
 def _overpower(disc, profile):
@@ -73,7 +73,7 @@ def _overpower(disc, profile):
     ps = player.power_speed(profile)
     if ps is None:
         return 0.0
-    return max(0.0, player.required_power(disc) - ps)
+    return max(0.0, player.required_power(roles.effective_flight(disc)) - ps)
 
 
 def _goal_components(goal, disc, profile, today=None):

@@ -43,7 +43,7 @@ _SPEED_MIN, _SPEED_MAX = 1.0, 14.0
 
 
 def _stability(disc):
-    return roles.stability_number(disc)
+    return roles.effective_stability(disc)
 
 
 def flight_scatter(discs, width=60, height=32):
@@ -55,7 +55,7 @@ def flight_scatter(discs, width=60, height=32):
     canvas = Canvas(width, height)
     for d in discs:
         stab = max(_STAB_MIN, min(_STAB_MAX, _stability(d)))
-        spd = max(_SPEED_MIN, min(_SPEED_MAX, float(d.speed)))
+        spd = max(_SPEED_MIN, min(_SPEED_MAX, roles.effective_flight(d).speed))
         x = round((stab - _STAB_MIN) / (_STAB_MAX - _STAB_MIN) * (width - 1))
         y = round((_SPEED_MAX - spd) / (_SPEED_MAX - _SPEED_MIN) * (height - 1))
         canvas.set(x, y)
@@ -75,9 +75,10 @@ def flight_scatter(discs, width=60, height=32):
 
     lines.append("")
     lines.append("Discs:")
-    for d in sorted(discs, key=lambda x: (-float(x.speed), _stability(x))):
+    for d in sorted(discs, key=lambda x: (-roles.effective_flight(x).speed, _stability(x))):
         brand = f"{d.brand} " if getattr(d, "brand", "") else ""
-        nums = "/".join(_g(v) for v in (d.speed, d.glide, d.turn, d.fade))
+        f = roles.effective_flight(d)
+        nums = "/".join(_g(v) for v in (f.speed, f.glide, f.turn, f.fade))
         lines.append(f"  {brand}{d.name}  ({nums})")
     return "\n".join(lines)
 

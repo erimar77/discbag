@@ -207,6 +207,18 @@ def test_personal_incomplete_does_not_satisfy():
     assert roles.flight_known(d) is False
 
 
+# ---------- effective_stability ----------
+
+def test_effective_stability_uses_personal_when_present():
+    from tests.conftest import prototype_disc
+    d = prototype_disc()   # personal turn=-1, fade=2 -> stability 1
+    assert roles.effective_stability(d) == 1.0
+
+
+def test_effective_stability_falls_back_to_manufacturer():
+    assert roles.effective_stability(MAKO3) == 0.0
+
+
 def test_stability_number_none_safe():
     from discbag.inventory import Disc
     assert roles.stability_number(Disc(name="C", speed=10)) is None      # incomplete → None

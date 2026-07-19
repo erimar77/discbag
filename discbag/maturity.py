@@ -146,7 +146,7 @@ def assess_phase(active, all_discs, profile, today):
 
 
 def _broad_category(disc):
-    speed = float(disc.speed)
+    speed = roles.effective_flight(disc).speed
     if speed <= 3:
         return "putter"
     if speed <= 5:
@@ -256,7 +256,7 @@ def usage_insights(active, today):
 
 
 def _stability_group(disc):
-    stab = roles.stability_number(disc)
+    stab = roles.effective_stability(disc)
     if stab <= -0.5:
         return "understable"
     if stab < 1.5:
@@ -290,7 +290,7 @@ def observed_preferences(active):
         out.append("Your bag runs neutral and straight.")
 
     # Speed cluster: only claim one when most discs fall in a narrow (≤3-wide) band.
-    speeds = sorted(int(round(float(d.speed))) for d in active)
+    speeds = sorted(int(round(roles.effective_flight(d).speed)) for d in active)
     if len(speeds) >= 4:
         best = None
         for lo in range(speeds[0], speeds[-1] + 1):

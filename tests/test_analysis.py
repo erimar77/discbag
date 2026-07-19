@@ -207,3 +207,38 @@ def test_compare_verdict_skipped_when_a_disc_is_unknown():
                  speed=11, glide=5, turn=-1, fade=3)
     unknown = Disc(name="Comanche", brand="Gateway", speed=10)
     assert analysis.compare_verdict([known, unknown]) is None       # can't reason without flight
+
+
+# ---------- manufacturer-incomplete + personal-complete prototypes ----------
+
+def test_choose_includes_prototype_reasoned_on_personal_numbers():
+    from tests.conftest import prototype_disc
+    d = prototype_disc()   # raw d.speed/turn/fade are all None
+    picks = analysis.choose([d], distance=280, shape="straight")
+    assert len(picks) == 1
+    assert picks[0].disc is d
+
+
+def test_overlap_includes_prototypes_that_fly_alike():
+    from tests.conftest import prototype_disc
+    d1 = prototype_disc(name="Comanche1")
+    d2 = prototype_disc(name="Comanche2")
+    groups = analysis.overlap([d1, d2])
+    assert any({dd.name for dd in g} == {"Comanche1", "Comanche2"} for g in groups)
+
+
+def test_compare_prototype_renders_dash_for_manufacturer_cells():
+    from tests.conftest import prototype_disc
+    d = prototype_disc()
+    table = analysis.compare([WRAITH, d])
+    rows = {r.label: r.values for r in table.rows}
+    assert rows["Speed"][1] == "—"
+    assert rows["Glide"][1] == "—"
+    assert rows["Turn"][1] == "—"
+    assert rows["Fade"][1] == "—"
+
+
+def test_compare_verdict_none_when_manufacturer_incomplete_but_personal_complete():
+    from tests.conftest import prototype_disc
+    d = prototype_disc()
+    assert analysis.compare_verdict([WRAITH, d]) is None
