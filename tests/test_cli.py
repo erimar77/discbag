@@ -855,9 +855,21 @@ def test_positive_int_validator():
 
 def test_iso_date_validator():
     assert cli._iso_date("2026-07-03") == "2026-07-03"
-    for bad in ("not-a-date", "2026-13-40", "07/03/2026"):
+    # Strict YYYY-MM-DD: reject compact, ISO-week, slashed, and out-of-range forms.
+    for bad in ("not-a-date", "2026-13-40", "07/03/2026", "20260703", "2026-W27-3"):
         with pytest.raises(argparse.ArgumentTypeError):
             cli._iso_date(bad)
+
+
+def test_non_negative_validators():
+    assert cli._non_negative_int("0") == 0
+    assert cli._non_negative_int("175") == 175
+    assert cli._non_negative_number("0") == 0.0
+    for bad in ("-1", "abc"):
+        with pytest.raises(argparse.ArgumentTypeError):
+            cli._non_negative_int(bad)
+    with pytest.raises(argparse.ArgumentTypeError):
+        cli._non_negative_number("-2.5")
 
 
 def test_parser_rejects_bad_date_and_count():
@@ -866,6 +878,16 @@ def test_parser_rejects_bad_date_and_count():
         parser.parse_args(["round-used", "mako3", "--date", "not-a-date"])
     with pytest.raises(SystemExit):
         parser.parse_args(["practice", "--count", "-1"])
+
+
+def test_parser_rejects_negative_physical_measurements():
+    parser = cli.build_parser()
+    with pytest.raises(SystemExit):
+        parser.parse_args(["profile", "--max", "-10"])
+    with pytest.raises(SystemExit):
+        parser.parse_args(["add", "mako3", "--weight", "-5"])
+    with pytest.raises(SystemExit):
+        parser.parse_args(["profile", "--driver-speed", "-3"])
 
 
 def test_score_has_no_scenario_component(tmp_path, capsys):

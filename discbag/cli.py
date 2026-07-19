@@ -1,6 +1,7 @@
 """Command-line interface for discbag."""
 
 import argparse
+import re
 import sys
 from datetime import date, datetime, timezone
 
@@ -22,12 +23,40 @@ def _positive_int(s):
 
 
 def _iso_date(s):
-    """argparse type: a date in YYYY-MM-DD form (returns the original string)."""
+    """argparse type: a date in YYYY-MM-DD form (returns the original string).
+
+    Strict on format — `date.fromisoformat` alone accepts compact (20260703) and
+    ISO week (2026-W27-3) forms on newer Pythons, which don't match the documented
+    format or our persisted convention."""
+    if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", str(s)):
+        raise argparse.ArgumentTypeError("must be a date in YYYY-MM-DD form")
     try:
         date.fromisoformat(s)
     except (TypeError, ValueError):
         raise argparse.ArgumentTypeError("must be a date in YYYY-MM-DD form")
     return s
+
+
+def _non_negative_int(s):
+    """argparse type: an integer >= 0 (for weights, distances)."""
+    try:
+        value = int(s)
+    except (TypeError, ValueError):
+        raise argparse.ArgumentTypeError("must be a non-negative integer")
+    if value < 0:
+        raise argparse.ArgumentTypeError("must be a non-negative integer")
+    return value
+
+
+def _non_negative_number(s):
+    """argparse type: a number >= 0 (for speeds, spin)."""
+    try:
+        value = float(s)
+    except (TypeError, ValueError):
+        raise argparse.ArgumentTypeError("must be a non-negative number")
+    if value < 0:
+        raise argparse.ArgumentTypeError("must be a non-negative number")
+    return value
 
 
 # ---------- pure formatting helpers ----------
@@ -1547,7 +1576,7 @@ def build_parser():
     p_add = sub.add_parser("add", help="add a disc to your bag (looks up stats)")
     p_add.add_argument("query", nargs="+", help="disc name, e.g. 'Gateway Wizard SS Chalky'")
     p_add.add_argument("--plastic", help="plastic/run, stored as metadata")
-    p_add.add_argument("--weight", type=int, help="weight in grams")
+    p_add.add_argument("--weight", type=_non_negative_int, help="weight in grams")
     p_add.add_argument("--color")
     p_add.add_argument("--condition", help="e.g. New, Used, Beat-in")
     p_add.add_argument("--location", help="where you bought it")
@@ -1596,7 +1625,8 @@ def build_parser():
                         help="how the old copy left the bag (default: retired)")
     p_repl.add_argument("--reason", help="a note about the old copy")
     p_repl.add_argument("--plastic", help="override the new copy's plastic")
-    p_repl.add_argument("--weight", type=int, help="override the new copy's weight (grams)")
+    p_repl.add_argument("--weight", type=_non_negative_int,
+                        help="override the new copy's weight (grams)")
     p_repl.add_argument("--color", help="override the new copy's color")
     p_repl.set_defaults(func=cmd_replace)
 
@@ -1608,7 +1638,7 @@ def build_parser():
     p_edit.add_argument("--manufacturer", help="correct the manufacturer/brand")
     p_edit.add_argument("--mold", help="correct the mold name")
     p_edit.add_argument("--plastic")
-    p_edit.add_argument("--weight", type=int)
+    p_edit.add_argument("--weight", type=_non_negative_int)
     p_edit.add_argument("--color")
     p_edit.add_argument("--condition", help="e.g. New, Used, Beat-in")
     p_edit.add_argument("--notes")
@@ -1746,15 +1776,15 @@ def build_parser():
                               "'grid' is the letter chart)")
     p_chart.set_defaults(func=cmd_chart)
 
-    sub.add_parser("overlap", help="find near-duplicate discs in your bag"
+    sub.add_parser("overlap", help="find near-duplicate discs in your inventory"
                    ).set_defaults(func=cmd_overlap)
 
-    p_cmp = sub.add_parser("compare", help="compare discs side by side (bag or database)")
+    p_cmp = sub.add_parser("compare", help="compare discs side by side (inventory or database)")
     p_cmp.add_argument("discs", nargs="+")
     p_cmp.set_defaults(func=cmd_compare)
 
     p_choose = sub.add_parser("choose", help="pick the best disc from your carry bag for a shot")
-    p_choose.add_argument("--distance", type=int, help="shot distance in feet")
+    p_choose.add_argument("--distance", type=_non_negative_int, help="shot distance in feet")
     p_choose.add_argument("--wind", choices=["head", "tail", "none"], help="wind direction")
     p_choose.add_argument("--shape", choices=["straight", "hyzer", "anhyzer", "turnover"],
                           help="desired shot shape")
@@ -1771,12 +1801,12 @@ def build_parser():
     p_prof.add_argument("--putt-hand", "--putt", dest="putt_hand", choices=["right", "left"],
                         help="putting hand, if you putt with the other hand")
     p_prof.add_argument("--style", choices=["backhand", "forehand", "both"])
-    p_prof.add_argument("--typical", type=int, help="typical golf distance (ft)")
-    p_prof.add_argument("--max", type=int, help="max controlled distance (ft)")
-    p_prof.add_argument("--fairway-speed", dest="fairway_speed", type=float)
-    p_prof.add_argument("--driver-speed", dest="driver_speed", type=float)
-    p_prof.add_argument("--release-speed", dest="release_speed", type=float)
-    p_prof.add_argument("--spin", type=float, help="typical spin rate (rpm)")
+    p_prof.add_argument("--typical", type=_non_negative_int, help="typical golf distance (ft)")
+    p_prof.add_argument("--max", type=_non_negative_int, help="max controlled distance (ft)")
+    p_prof.add_argument("--fairway-speed", dest="fairway_speed", type=_non_negative_number)
+    p_prof.add_argument("--driver-speed", dest="driver_speed", type=_non_negative_number)
+    p_prof.add_argument("--release-speed", dest="release_speed", type=_non_negative_number)
+    p_prof.add_argument("--spin", type=_non_negative_number, help="typical spin rate (rpm)")
     p_prof.add_argument("--brand", action="append", help="a preferred brand (repeatable)")
     p_prof.add_argument("--clear-brands", action="store_true", help="clear preferred brands")
     p_prof.set_defaults(func=cmd_profile)
@@ -1784,7 +1814,8 @@ def build_parser():
     p_flight = sub.add_parser("flight", help="record how a disc actually flies for you")
     p_flight.add_argument("disc")
     p_flight.add_argument("numbers", nargs="?", help="speed/glide/turn/fade, e.g. 6/5/-1/2")
-    p_flight.add_argument("--distance", type=int, help="your average distance in feet")
+    p_flight.add_argument("--distance", type=_non_negative_int,
+                          help="your average distance in feet")
     p_flight.add_argument("--confidence", type=int, choices=range(1, 6),
                           help="how sure you are, 1-5")
     p_flight.add_argument("--clear", action="store_true", help="remove personal flight numbers")
