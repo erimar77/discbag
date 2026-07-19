@@ -35,7 +35,9 @@ def flight_known(disc):
 
 
 def stability_number(disc):
-    """A single overall-stability number: turn + fade (negative = understable)."""
+    """turn + fade, or None if flight is incomplete."""
+    if disc.turn is None or disc.fade is None:
+        return None
     return float(disc.turn) + float(disc.fade)
 
 
@@ -138,16 +140,18 @@ _SITUATIONS = {
 
 
 def effective_flight(disc):
-    """The flight numbers to reason with: personal if recorded, else manufacturer."""
-    personal = getattr(getattr(disc, "user", None), "personal_flight", None)
-    if personal:
-        return Flight(
-            speed=float(personal.get("speed", disc.speed)),
-            glide=float(personal.get("glide", getattr(disc, "glide", 0))),
-            turn=float(personal.get("turn", disc.turn)),
-            fade=float(personal.get("fade", disc.fade)),
-        )
-    return Flight(speed=float(disc.speed), glide=float(getattr(disc, "glide", 0)),
+    """The flight numbers to reason with: personal if recorded, else manufacturer.
+
+    Callers must only pass `flight_known` discs — Unknown flight is never coerced
+    to 0; incomplete data fails loudly instead.
+    """
+    if _personal_complete(disc):
+        p = disc.user.personal_flight
+        return Flight(speed=float(p["speed"]), glide=float(p["glide"]),
+                      turn=float(p["turn"]), fade=float(p["fade"]))
+    if not _manufacturer_complete(disc):
+        raise ValueError("effective_flight requires complete flight data")
+    return Flight(speed=float(disc.speed), glide=float(disc.glide),
                   turn=float(disc.turn), fade=float(disc.fade))
 
 

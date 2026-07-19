@@ -205,3 +205,16 @@ def test_personal_incomplete_does_not_satisfy():
                                   "glide": None, "turn": None, "fade": None, "stability": ""})
     d.user.personal_flight = {"speed": 10}                              # partial
     assert roles.flight_known(d) is False
+
+
+def test_stability_number_none_safe():
+    from discbag.inventory import Disc
+    assert roles.stability_number(Disc(name="C", speed=10)) is None      # incomplete → None
+    assert roles.stability_number(Disc(name="B", speed=5, glide=4, turn=-1, fade=1)) == 0.0
+
+
+def test_effective_flight_raises_on_incomplete():
+    import pytest
+    from discbag.inventory import Disc
+    with pytest.raises(ValueError):                                      # never invents zeros
+        roles.effective_flight(Disc(name="C", speed=10))                 # no personal, incomplete
