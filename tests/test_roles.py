@@ -218,3 +218,16 @@ def test_effective_flight_raises_on_incomplete():
     from discbag.inventory import Disc
     with pytest.raises(ValueError):                                      # never invents zeros
         roles.effective_flight(Disc(name="C", speed=10))                 # no personal, incomplete
+
+
+def test_assess_ignores_unknown_flight_discs():
+    from discbag.inventory import OwnedDisc
+    known = OwnedDisc.from_db_record({"name": "Aviar", "brand": "Innova", "category": "Putter",
+                                      "speed": 2, "glide": 3, "turn": 0, "fade": 1, "stability": ""})
+    unknown = OwnedDisc.from_db_record({"name": "Comanche", "brand": "Gateway", "category": "",
+                                        "speed": 10, "glide": None, "turn": None, "fade": None,
+                                        "stability": ""})
+    cov = roles.assess([known, unknown])
+    # the Unknown disc fills no role
+    for rc in cov:
+        assert unknown not in rc.discs

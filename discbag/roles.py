@@ -212,6 +212,7 @@ _PRIORITY_RANK = {"Satisfied": -1, "High": 0, "Medium": 1, "Low": 2}
 
 def _bag_behaves_overstable(bag, profile):
     """True when most of the bag already fades (fights right) for this player."""
+    bag = [d for d in bag if flight_known(d)]
     if not bag:
         return False
     overstable = sum(1 for d in bag
@@ -255,6 +256,7 @@ class NextPurchase:
 def assess(bag, profile=None):
     """For every role: which owned discs fill it, whether it's covered, and how
     valuable filling it would be for this player (priority)."""
+    bag = [d for d in bag if flight_known(d)]     # Unknown-flight discs fill no role
     assessment = []
     for role in ROLES:
         fits = sorted((d for d in bag if qualifies(d, role)),
