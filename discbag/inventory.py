@@ -323,7 +323,13 @@ class OwnedDisc:
                 "cached": self.cached.to_dict(), "user": self.user.to_dict()}
 
     def refresh_from_db(self, db_discs):
-        """Update the cached mold snapshot from the DB. User data is left untouched."""
+        """Update the cached mold snapshot from the DB. User data is left untouched.
+
+        v1 refreshes DiscItDB molds only; a locally-authored mold (or any other
+        origin) is authoritative — its partial specs, provenance, and notes are
+        never overwritten by a same-name catalog entry."""
+        if self.cached.origin != "discit":
+            return False
         target = (self.brand.strip().lower(), self.mold.strip().lower())
         for record in db_discs:
             if (str(record.get("brand", "")).strip().lower(),

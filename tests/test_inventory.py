@@ -75,6 +75,28 @@ def test_refresh_from_db_keeps_cache_when_mold_absent():
     assert disc.speed == 5     # falls back to cached snapshot
 
 
+def test_refresh_never_overwrites_local_mold():
+    # A locally-authored mold (origin != "discit") is authoritative: a same-name
+    # catalog entry with fuller numbers must not clobber its partial specs/notes.
+    rec = {"name": "Comanche", "brand": "Gateway", "category": "",
+           "speed": 10, "glide": None, "turn": None, "fade": None, "stability": "",
+           "release_status": "prototype", "origin": "local",
+           "manufacturer_notes": ["Long forward push"]}
+    disc = OwnedDisc.from_db_record(rec)
+    catalog = [{"name": "Comanche", "brand": "Gateway", "category": "Distance Driver",
+                "speed": 10, "glide": 5, "turn": -1, "fade": 2, "stability": ""}]
+    assert disc.refresh_from_db(catalog) is False   # skipped, no update reported
+    assert disc.cached.origin == "local"            # untouched
+    assert disc.cached.turn is None                 # local partial specs preserved
+    assert disc.cached.manufacturer_notes == ["Long forward push"]
+
+
+def test_refresh_still_updates_discit_mold():
+    disc = OwnedDisc.from_db_record(MAKO3)          # origin defaults "discit"
+    assert disc.refresh_from_db([dict(MAKO3, fade=1)]) is True
+    assert disc.fade == 1                           # discit mold refreshes as before
+
+
 # ---------- Inventory ----------
 
 def test_add_and_list(tmp_path):
