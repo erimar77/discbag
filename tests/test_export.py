@@ -200,6 +200,21 @@ def test_catalog_map_excludes_unreferenced_records():
     assert "innova-destroyer" not in out["catalog"]
 
 
+def test_catalog_map_winner_is_stable_regardless_of_inventory_order():
+    # Two owned discs share a catalog_id (same brand + mold name) but carry
+    # different cached flight numbers -- e.g. one locally-authored, one
+    # catalog-sourced under the same brand+name. Whichever record "wins" the
+    # catalog map's summary must be determined by inventory_id order (the
+    # same ordering `inventory` records are sorted by), not by whatever
+    # order the caller happened to pass the `inventory` list in.
+    low_id = owned(disc_id="id-a", speed=2, glide=3, turn=0, fade=2)
+    high_id = owned(disc_id="id-b", speed=9, glide=3, turn=-1, fade=1)
+    forward = build([low_id, high_id])["catalog"]["gateway-wizard"]
+    backward = build([high_id, low_id])["catalog"]["gateway-wizard"]
+    assert forward == backward
+    assert forward["flight"] == {"speed": 2, "glide": 3, "turn": 0, "fade": 2}
+
+
 # ---------- coverage / gaps ----------
 
 def test_coverage_reports_every_role_with_priority_and_reason():

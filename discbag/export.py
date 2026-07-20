@@ -303,8 +303,12 @@ def build_export(inventory, profile, catalog, *, analysis_date, generated_at):
     """
     records = sorted((_inventory_record(d, profile) for d in inventory),
                      key=lambda r: r["inventory_id"])
+    # setdefault is first-wins: if two owned discs share a catalog_id but carry
+    # differing cached mold data, the winner must not depend on the caller's
+    # inventory order. Walk the same inventory_id ordering used for `records`
+    # above so the result is stable regardless of how `inventory` was passed in.
     catalog_map = {}
-    for disc in inventory:
+    for disc in sorted(inventory, key=lambda d: d.id):
         catalog_map.setdefault(db.catalog_id(disc), _catalog_summary(disc))
 
     active = [d for d in inventory if d.user.is_active]

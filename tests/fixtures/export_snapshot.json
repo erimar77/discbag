@@ -1,0 +1,684 @@
+{
+  "analysis": {
+    "coverage": [
+      {
+        "covered": true,
+        "description": "putting and short, controlled approaches",
+        "disc_ids": [
+          "id-a",
+          "id-b"
+        ],
+        "priority": "Satisfied",
+        "priority_reason": "",
+        "reason": "a slow, stable flight you can trust up close",
+        "role": "Putting"
+      },
+      {
+        "covered": false,
+        "description": "straight, controllable approach shots",
+        "disc_ids": [],
+        "priority": "Medium",
+        "priority_reason": "",
+        "reason": "No straight, controllable approach disc.",
+        "role": "Straight approach"
+      },
+      {
+        "covered": false,
+        "description": "reliable fade for headwind and forehand approaches",
+        "disc_ids": [],
+        "priority": "High",
+        "priority_reason": "",
+        "reason": "No overstable approach disc that reliably fades in wind.",
+        "role": "Overstable approach"
+      },
+      {
+        "covered": false,
+        "description": "neutral tunnel shots with minimal fade",
+        "disc_ids": [],
+        "priority": "High",
+        "priority_reason": "",
+        "reason": "No neutral, straight-flying midrange.",
+        "role": "Straight mid"
+      },
+      {
+        "covered": false,
+        "description": "dependable fade in wind and on forced flex shots",
+        "disc_ids": [],
+        "priority": "Medium",
+        "priority_reason": "",
+        "reason": "No overstable midrange with the fade to hold up in wind.",
+        "role": "Overstable mid"
+      },
+      {
+        "covered": false,
+        "description": "easy turnovers, hyzer flips and rollers",
+        "disc_ids": [],
+        "priority": "Medium",
+        "priority_reason": "",
+        "reason": "No understable fairway for turnovers and hyzer flips.",
+        "role": "Understable fairway"
+      },
+      {
+        "covered": false,
+        "description": "accurate placement with a predictable finish",
+        "disc_ids": [],
+        "priority": "High",
+        "priority_reason": "",
+        "reason": "No stable control fairway for accurate placement.",
+        "role": "Control fairway"
+      },
+      {
+        "covered": false,
+        "description": "wind resistance, skips, flex and escape shots",
+        "disc_ids": [],
+        "priority": "Medium",
+        "priority_reason": "",
+        "reason": "No disc has enough fade to reliably serve as a utility driver.",
+        "role": "Utility driver"
+      },
+      {
+        "covered": true,
+        "description": "maximum distance off the tee",
+        "disc_ids": [
+          "id-c"
+        ],
+        "priority": "Satisfied",
+        "priority_reason": "",
+        "reason": "the speed to reach maximum distance",
+        "role": "Distance driver"
+      }
+    ],
+    "exclusions": [],
+    "gaps": [
+      {
+        "covered": false,
+        "description": "straight, controllable approach shots",
+        "disc_ids": [],
+        "priority": "Medium",
+        "priority_reason": "",
+        "reason": "No straight, controllable approach disc.",
+        "role": "Straight approach"
+      },
+      {
+        "covered": false,
+        "description": "reliable fade for headwind and forehand approaches",
+        "disc_ids": [],
+        "priority": "High",
+        "priority_reason": "",
+        "reason": "No overstable approach disc that reliably fades in wind.",
+        "role": "Overstable approach"
+      },
+      {
+        "covered": false,
+        "description": "neutral tunnel shots with minimal fade",
+        "disc_ids": [],
+        "priority": "High",
+        "priority_reason": "",
+        "reason": "No neutral, straight-flying midrange.",
+        "role": "Straight mid"
+      },
+      {
+        "covered": false,
+        "description": "dependable fade in wind and on forced flex shots",
+        "disc_ids": [],
+        "priority": "Medium",
+        "priority_reason": "",
+        "reason": "No overstable midrange with the fade to hold up in wind.",
+        "role": "Overstable mid"
+      },
+      {
+        "covered": false,
+        "description": "easy turnovers, hyzer flips and rollers",
+        "disc_ids": [],
+        "priority": "Medium",
+        "priority_reason": "",
+        "reason": "No understable fairway for turnovers and hyzer flips.",
+        "role": "Understable fairway"
+      },
+      {
+        "covered": false,
+        "description": "accurate placement with a predictable finish",
+        "disc_ids": [],
+        "priority": "High",
+        "priority_reason": "",
+        "reason": "No stable control fairway for accurate placement.",
+        "role": "Control fairway"
+      },
+      {
+        "covered": false,
+        "description": "wind resistance, skips, flex and escape shots",
+        "disc_ids": [],
+        "priority": "Medium",
+        "priority_reason": "",
+        "reason": "No disc has enough fade to reliably serve as a utility driver.",
+        "role": "Utility driver"
+      }
+    ],
+    "goal_bags": {
+      "confidence": {
+        "filled": [
+          {
+            "disc_id": "id-a",
+            "fit_score": 1.2449899597988732,
+            "role": "Putting"
+          },
+          {
+            "disc_id": "id-c",
+            "fit_score": 0.570087712549569,
+            "role": "Distance driver"
+          }
+        ],
+        "gaps": [
+          "Straight mid",
+          "Control fairway",
+          "Overstable approach",
+          "Utility driver",
+          "Straight approach",
+          "Overstable mid",
+          "Understable fairway"
+        ],
+        "omitted": []
+      },
+      "coverage": {
+        "filled": [
+          {
+            "disc_id": "id-a",
+            "fit_score": 1.2449899597988732,
+            "role": "Putting"
+          },
+          {
+            "disc_id": "id-c",
+            "fit_score": 0.570087712549569,
+            "role": "Distance driver"
+          }
+        ],
+        "gaps": [
+          "Straight mid",
+          "Control fairway",
+          "Overstable approach",
+          "Utility driver",
+          "Straight approach",
+          "Overstable mid",
+          "Understable fairway"
+        ],
+        "omitted": []
+      },
+      "development": {
+        "filled": [
+          {
+            "disc_id": "id-a",
+            "fit_score": 1.2449899597988732,
+            "role": "Putting"
+          },
+          {
+            "disc_id": "id-c",
+            "fit_score": 0.570087712549569,
+            "role": "Distance driver"
+          }
+        ],
+        "gaps": [
+          "Straight mid",
+          "Control fairway",
+          "Overstable approach",
+          "Utility driver",
+          "Straight approach",
+          "Overstable mid",
+          "Understable fairway"
+        ],
+        "omitted": []
+      },
+      "fun": {
+        "filled": [
+          {
+            "disc_id": "id-a",
+            "fit_score": 1.2449899597988732,
+            "role": "Putting"
+          },
+          {
+            "disc_id": "id-c",
+            "fit_score": 0.570087712549569,
+            "role": "Distance driver"
+          }
+        ],
+        "gaps": [
+          "Straight mid",
+          "Control fairway",
+          "Overstable approach",
+          "Utility driver",
+          "Straight approach",
+          "Overstable mid",
+          "Understable fairway"
+        ],
+        "omitted": []
+      },
+      "tournament": {
+        "filled": [
+          {
+            "disc_id": "id-a",
+            "fit_score": 1.2449899597988732,
+            "role": "Putting"
+          },
+          {
+            "disc_id": "id-c",
+            "fit_score": 0.570087712549569,
+            "role": "Distance driver"
+          }
+        ],
+        "gaps": [
+          "Straight mid",
+          "Control fairway",
+          "Overstable approach",
+          "Utility driver",
+          "Straight approach",
+          "Overstable mid",
+          "Understable fairway"
+        ],
+        "omitted": []
+      }
+    },
+    "maturity": {
+      "observed_preferences": [
+        "Your bag leans stable-to-overstable."
+      ],
+      "phase": "Discovery",
+      "signals": [
+        {
+          "met": false,
+          "text": "Missing straight approach (medium priority)"
+        },
+        {
+          "met": false,
+          "text": "Missing overstable approach (high priority)"
+        },
+        {
+          "met": false,
+          "text": "Missing straight mid (high priority)"
+        },
+        {
+          "met": false,
+          "text": "Missing overstable mid (medium priority)"
+        },
+        {
+          "met": false,
+          "text": "Missing understable fairway (medium priority)"
+        },
+        {
+          "met": false,
+          "text": "Missing control fairway (high priority)"
+        },
+        {
+          "met": false,
+          "text": "Missing utility driver (medium priority)"
+        }
+      ],
+      "usage_insights": []
+    },
+    "next_purchase": {
+      "candidates": [],
+      "priority": "High",
+      "reason": "Your bag already covers putting and distance driver. No neutral, straight-flying midrange.",
+      "role": "Straight mid"
+    },
+    "overlap_groups": [
+      {
+        "group_id": "overlap-id-a-id-b",
+        "inventory_ids": [
+          "id-a",
+          "id-b"
+        ]
+      }
+    ],
+    "pairwise_comparisons": [
+      {
+        "left_inventory_id": "id-a",
+        "right_inventory_id": "id-b",
+        "verdict": {
+          "degraded_note": null,
+          "how_to_use": "These fly very similarly \u2014 reach for whichever you trust; there's no meaningful finish difference between them.",
+          "key_difference": "The Wizard flies almost identically. The Challenger flies almost identically.",
+          "overlap_text": "These fly very similarly and largely duplicate each other in the putting slot."
+        }
+      },
+      {
+        "left_inventory_id": "id-a",
+        "right_inventory_id": "id-c",
+        "verdict": {
+          "degraded_note": null,
+          "how_to_use": "The Destroyer has more turn and more fade. The Wizard resists turning more and finishes more gently.",
+          "key_difference": "The Wizard has a gentler finish; it also resists turning more and is a touch slower. The Destroyer has more high-speed turn and a higher speed ceiling; it also fades harder.",
+          "overlap_text": "These fill different roles \u2014 Putting vs Distance driver \u2014 and complement each other."
+        }
+      },
+      {
+        "left_inventory_id": "id-b",
+        "right_inventory_id": "id-c",
+        "verdict": {
+          "degraded_note": null,
+          "how_to_use": "The Destroyer has more turn and more fade. The Challenger resists turning more and finishes more gently.",
+          "key_difference": "The Challenger has a gentler finish; it also resists turning more and is a touch slower. The Destroyer has more high-speed turn and a higher speed ceiling; it also fades harder.",
+          "overlap_text": "These fill different roles \u2014 Putting vs Distance driver \u2014 and complement each other."
+        }
+      }
+    ],
+    "scenario_aliases": {
+      "rain": "windy",
+      "travel": "minimal"
+    },
+    "scenario_bags": {
+      "minimal": {
+        "filled": [
+          {
+            "disc_id": "id-a",
+            "fit_score": 1.2449899597988732,
+            "role": "Putting"
+          }
+        ],
+        "gaps": [
+          "Straight mid",
+          "Control fairway",
+          "Overstable approach"
+        ],
+        "omitted": []
+      },
+      "windy": {
+        "filled": [
+          {
+            "disc_id": "id-a",
+            "fit_score": 1.2449899597988732,
+            "role": "Putting"
+          }
+        ],
+        "gaps": [
+          "Control fairway",
+          "Overstable approach",
+          "Utility driver",
+          "Overstable mid"
+        ],
+        "omitted": []
+      },
+      "woods": {
+        "filled": [
+          {
+            "disc_id": "id-a",
+            "fit_score": 1.2449899597988732,
+            "role": "Putting"
+          }
+        ],
+        "gaps": [
+          "Straight mid",
+          "Control fairway",
+          "Straight approach",
+          "Understable fairway"
+        ],
+        "omitted": []
+      }
+    }
+  },
+  "analysis_defaults": {
+    "bag_size": null,
+    "goal": "coverage",
+    "rotate": false
+  },
+  "catalog": {
+    "discraft-challenger": {
+      "brand": "Discraft",
+      "catalog_id": "discraft-challenger",
+      "category": "Putter",
+      "flight": {
+        "fade": 2.0,
+        "glide": 3.0,
+        "speed": 2.0,
+        "turn": 0.0
+      },
+      "name": "Challenger",
+      "stability": ""
+    },
+    "gateway-wizard": {
+      "brand": "Gateway",
+      "catalog_id": "gateway-wizard",
+      "category": "Putter",
+      "flight": {
+        "fade": 2.0,
+        "glide": 3.0,
+        "speed": 2.0,
+        "turn": 0.0
+      },
+      "name": "Wizard",
+      "stability": ""
+    },
+    "innova-destroyer": {
+      "brand": "Innova",
+      "catalog_id": "innova-destroyer",
+      "category": "Distance Driver",
+      "flight": {
+        "fade": 3.0,
+        "glide": 5.0,
+        "speed": 12.0,
+        "turn": -1.0
+      },
+      "name": "Destroyer",
+      "stability": ""
+    }
+  },
+  "discbag_version": "0.1.0",
+  "generated_at": "2026-07-20T14:32:11Z",
+  "inventory": [
+    {
+      "catalog_id": "gateway-wizard",
+      "computed": {
+        "behaves_flight": {
+          "fade": 2.0,
+          "glide": 3.0,
+          "speed": 2.0,
+          "turn": 0.0
+        },
+        "effective_flight": {
+          "fade": 2.0,
+          "glide": 3.0,
+          "speed": 2.0,
+          "turn": 0.0
+        },
+        "fit_score": 1.2449899597988732,
+        "flight_known": true,
+        "primary_role": "Putting",
+        "required_power": 2.0,
+        "stability": 2.0
+      },
+      "history_summary": {
+        "acquired": null,
+        "first_used": null,
+        "last_practice": null,
+        "last_round": null,
+        "last_used": null,
+        "practices": 0,
+        "rounds": 0,
+        "use_count": 0
+      },
+      "inventory_id": "id-a",
+      "manufacturer": {
+        "brand": "Gateway",
+        "category": "Putter",
+        "flight": {
+          "fade": 2,
+          "glide": 3,
+          "speed": 2,
+          "turn": 0
+        },
+        "stability": ""
+      },
+      "mold": "Wizard",
+      "user": {
+        "color": "",
+        "condition": "",
+        "damaged": false,
+        "date_added": null,
+        "edition": "",
+        "events": null,
+        "favorite": false,
+        "in_bag": true,
+        "last_used": null,
+        "notes": "",
+        "personal_flight": null,
+        "plastic": "",
+        "purchase_location": "",
+        "role": "",
+        "status": "active",
+        "status_date": null,
+        "status_reason": null,
+        "tags": [],
+        "use_count": 0,
+        "use_dates": [],
+        "weight": null
+      }
+    },
+    {
+      "catalog_id": "discraft-challenger",
+      "computed": {
+        "behaves_flight": {
+          "fade": 2.0,
+          "glide": 3.0,
+          "speed": 2.0,
+          "turn": 0.0
+        },
+        "effective_flight": {
+          "fade": 2.0,
+          "glide": 3.0,
+          "speed": 2.0,
+          "turn": 0.0
+        },
+        "fit_score": 1.2449899597988732,
+        "flight_known": true,
+        "primary_role": "Putting",
+        "required_power": 2.0,
+        "stability": 2.0
+      },
+      "history_summary": {
+        "acquired": null,
+        "first_used": null,
+        "last_practice": null,
+        "last_round": null,
+        "last_used": null,
+        "practices": 0,
+        "rounds": 0,
+        "use_count": 0
+      },
+      "inventory_id": "id-b",
+      "manufacturer": {
+        "brand": "Discraft",
+        "category": "Putter",
+        "flight": {
+          "fade": 2,
+          "glide": 3,
+          "speed": 2,
+          "turn": 0
+        },
+        "stability": ""
+      },
+      "mold": "Challenger",
+      "user": {
+        "color": "",
+        "condition": "",
+        "damaged": false,
+        "date_added": null,
+        "edition": "",
+        "events": null,
+        "favorite": false,
+        "in_bag": true,
+        "last_used": null,
+        "notes": "",
+        "personal_flight": null,
+        "plastic": "",
+        "purchase_location": "",
+        "role": "",
+        "status": "active",
+        "status_date": null,
+        "status_reason": null,
+        "tags": [],
+        "use_count": 0,
+        "use_dates": [],
+        "weight": null
+      }
+    },
+    {
+      "catalog_id": "innova-destroyer",
+      "computed": {
+        "behaves_flight": {
+          "fade": 3.0,
+          "glide": 5.0,
+          "speed": 12.0,
+          "turn": -1.0
+        },
+        "effective_flight": {
+          "fade": 3.0,
+          "glide": 5.0,
+          "speed": 12.0,
+          "turn": -1.0
+        },
+        "fit_score": 0.570087712549569,
+        "flight_known": true,
+        "primary_role": "Distance driver",
+        "required_power": 12.1,
+        "stability": 2.0
+      },
+      "history_summary": {
+        "acquired": null,
+        "first_used": null,
+        "last_practice": null,
+        "last_round": null,
+        "last_used": null,
+        "practices": 0,
+        "rounds": 0,
+        "use_count": 0
+      },
+      "inventory_id": "id-c",
+      "manufacturer": {
+        "brand": "Innova",
+        "category": "Distance Driver",
+        "flight": {
+          "fade": 3,
+          "glide": 5,
+          "speed": 12,
+          "turn": -1
+        },
+        "stability": ""
+      },
+      "mold": "Destroyer",
+      "user": {
+        "color": "",
+        "condition": "",
+        "damaged": false,
+        "date_added": null,
+        "edition": "",
+        "events": null,
+        "favorite": false,
+        "in_bag": true,
+        "last_used": null,
+        "notes": "",
+        "personal_flight": null,
+        "plastic": "",
+        "purchase_location": "",
+        "role": "",
+        "status": "active",
+        "status_date": null,
+        "status_reason": null,
+        "tags": [],
+        "use_count": 0,
+        "use_dates": [],
+        "weight": null
+      }
+    }
+  ],
+  "profile": null,
+  "reports_included": [
+    "coverage",
+    "gaps",
+    "overlap_groups",
+    "pairwise_comparisons",
+    "goal_bags",
+    "scenario_bags",
+    "maturity",
+    "next_purchase",
+    "exclusions"
+  ],
+  "schema_version": "1.0"
+}
