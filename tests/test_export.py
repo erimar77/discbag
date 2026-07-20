@@ -415,3 +415,61 @@ def test_pairwise_carries_no_relationship_taxonomy():
 
 def test_single_disc_produces_an_empty_pairwise_list():
     assert build([owned()])["analysis"]["pairwise_comparisons"] == []
+
+
+# ---------- exclusions ----------
+
+def unknown_flight_disc(disc_id="id-unknown"):
+    d = OwnedDisc.from_db_record(
+        {"name": "Comanche", "brand": "Gateway", "category": "", "stability": "",
+         "speed": None, "glide": None, "turn": None, "fade": None})
+    d.id = disc_id
+    return d
+
+
+def test_incomplete_flight_disc_is_recorded_as_excluded():
+    out = build([owned(), unknown_flight_disc()])
+    entry = next(e for e in out["analysis"]["exclusions"]
+                 if e["inventory_id"] == "id-unknown")
+    assert entry["reason"] == "incomplete_flight_data"
+    assert set(entry["excluded_from"]) == {
+        "coverage", "goal_bags", "scenario_bags", "overlap_groups",
+        "pairwise_comparisons"}
+
+
+def test_inactive_disc_is_recorded_as_excluded():
+    out = build([owned(disc_id="id-active"),
+                 owned(disc_id="id-lost", status="lost")])
+    entry = next(e for e in out["analysis"]["exclusions"]
+                 if e["inventory_id"] == "id-lost")
+    assert entry["reason"] == "inactive_status"
+
+
+def test_excluded_discs_still_appear_in_inventory():
+    out = build([owned(), unknown_flight_disc()])
+    assert {r["inventory_id"] for r in out["inventory"]} == {"id-wizard", "id-unknown"}
+
+
+def test_excluded_disc_never_appears_in_the_reports_it_was_excluded_from():
+    out = build([owned(), unknown_flight_disc()])
+    for entry in out["analysis"]["coverage"]:
+        assert "id-unknown" not in entry["disc_ids"]
+    for pair in out["analysis"]["pairwise_comparisons"]:
+        assert "id-unknown" not in (pair["left_inventory_id"], pair["right_inventory_id"])
+
+
+def test_reason_codes_are_stable_machine_readable_slugs():
+    out = build([owned(), unknown_flight_disc(), owned(disc_id="id-lost", status="lost")])
+    for entry in out["analysis"]["exclusions"]:
+        assert entry["reason"] in {"incomplete_flight_data", "inactive_status"}
+
+
+def test_exclusions_are_sorted_by_id_then_reason():
+    out = build([owned(disc_id="id-z"), unknown_flight_disc("id-a"),
+                 owned(disc_id="id-m", status="lost")])
+    keys = [(e["inventory_id"], e["reason"]) for e in out["analysis"]["exclusions"]]
+    assert keys == sorted(keys)
+
+
+def test_no_exclusions_when_every_disc_participates():
+    assert build([owned()])["analysis"]["exclusions"] == []

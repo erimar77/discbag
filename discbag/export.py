@@ -241,6 +241,32 @@ def _pairwise_comparisons(active):
     return sorted(out, key=lambda p: (p["left_inventory_id"], p["right_inventory_id"]))
 
 
+# Reports each exclusion reason actually keeps a disc out of. Verified against
+# real engine behavior — a disc is never claimed to be excluded from a report
+# the engine in fact includes it in.
+_INCOMPLETE_FLIGHT_REPORTS = ["coverage", "goal_bags", "scenario_bags",
+                              "overlap_groups", "pairwise_comparisons"]
+_INACTIVE_REPORTS = ["coverage", "gaps", "goal_bags", "scenario_bags",
+                     "overlap_groups", "pairwise_comparisons", "next_purchase"]
+
+
+def _exclusions(inventory):
+    """Which owned discs the engine leaves out of which reports, and why.
+
+    Excluded discs stay visible in `inventory`; only their analysis
+    participation is limited.
+    """
+    out = []
+    for disc in inventory:
+        if not disc.user.is_active:
+            out.append({"inventory_id": disc.id, "reason": "inactive_status",
+                        "excluded_from": list(_INACTIVE_REPORTS)})
+        elif not roles.flight_known(disc):
+            out.append({"inventory_id": disc.id, "reason": "incomplete_flight_data",
+                        "excluded_from": list(_INCOMPLETE_FLIGHT_REPORTS)})
+    return sorted(out, key=lambda e: (e["inventory_id"], e["reason"]))
+
+
 def build_export(inventory, profile, catalog, *, analysis_date, generated_at):
     """A complete, deterministic snapshot of the collection and its analysis.
 
@@ -274,6 +300,7 @@ def build_export(inventory, profile, catalog, *, analysis_date, generated_at):
         analysis_section["scenario_aliases"] = dict(aliases)
         analysis_section["overlap_groups"] = _overlap_groups(active, profile)
         analysis_section["pairwise_comparisons"] = _pairwise_comparisons(active)
+    analysis_section["exclusions"] = _exclusions(inventory)
     analysis_section["maturity"] = _maturity(active, inventory, profile, analysis_date)
 
     return {
