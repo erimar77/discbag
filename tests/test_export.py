@@ -141,7 +141,8 @@ def test_computed_carries_role_fit_stability_and_power():
 def test_history_summary_counts_rounds_and_practices():
     d = owned(use_dates=[{"date": "2026-07-07", "session_type": "round"},
                          {"date": "2026-07-01", "session_type": "practice"}],
-              date_added="2025-03-11")
+              date_added="2025-03-11",
+              last_used="2026-07-07")
     rec = build([d])["inventory"][0]
     assert rec["history_summary"]["rounds"] == 1
     assert rec["history_summary"]["practices"] == 1

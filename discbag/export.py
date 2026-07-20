@@ -110,15 +110,12 @@ def _computed(disc, profile):
 
 def _history_summary(disc):
     u = disc.user
-    # Compute last_used as the max date from all uses (or use the stored field if available).
-    dates = [e["date"] for e in u.uses if e["date"]]
-    last_used = max(dates) if dates else u.last_used
     return {
         "rounds": u.round_count,
         "practices": u.practice_count,
         "use_count": u.use_count,
         "first_used": u.first_used,
-        "last_used": last_used,
+        "last_used": u.last_used,
         "last_round": u.last_round,
         "last_practice": u.last_practice,
         "acquired": u.date_added,
