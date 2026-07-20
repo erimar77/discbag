@@ -89,8 +89,16 @@ def test_practice_respects_count():
 
 # ---------- compare_verdict ----------
 
+def verdict_text(discs):
+    """The rendered verdict, so the existing wording assertions keep testing
+    exactly what the CLI prints."""
+    from discbag.cli import render_compare_verdict
+    v = analysis.compare_verdict(discs)
+    return None if v is None else render_compare_verdict(v)
+
+
 def test_verdict_two_discs_has_three_labeled_sections():
-    v = analysis.compare_verdict([WAVE, WRAITH])
+    v = verdict_text([WAVE, WRAITH])
     assert "Bottom line" in v
     assert "Overlap:" in v
     assert "Key difference:" in v
@@ -98,7 +106,7 @@ def test_verdict_two_discs_has_three_labeled_sections():
 
 
 def test_verdict_key_difference_matches_target_wording():
-    v = analysis.compare_verdict([WAVE, WRAITH])
+    v = verdict_text([WAVE, WRAITH])
     # Relative, per-disc trait sentences (reproduces the approved example).
     assert "The Wave has more high-speed turn and a gentler finish." in v
     assert "The Wraith resists turning more and fades harder." in v
@@ -110,26 +118,26 @@ def test_verdict_key_difference_no_awkward_double_and():
              speed=12, glide=5, turn=-3, fade=3)
     b = Disc(name="Bravo", brand="Y", category="Distance Driver",
              speed=9, glide=4, turn=-1, fade=1)
-    v = analysis.compare_verdict([a, b])
+    v = verdict_text([a, b])
     assert "ceiling and fades harder" not in v      # the awkward chain is gone
     assert "; it also fades harder" in v
 
 
 def test_verdict_uses_relative_not_absolute_stability():
-    v = analysis.compare_verdict([WAVE, WRAITH])
+    v = verdict_text([WAVE, WRAITH])
     # No absolute "is overstable"/"is understable" declaration in the verdict.
     assert "is overstable" not in v
     assert "is understable" not in v
 
 
 def test_verdict_same_slot_but_different_for_wave_wraith():
-    v = analysis.compare_verdict([WAVE, WRAITH])
+    v = verdict_text([WAVE, WRAITH])
     assert "same broad distance driver slot" in v.lower()
     assert "meaningfully different" in v
 
 
 def test_verdict_how_to_use_has_softened_fade_caveat():
-    v = analysis.compare_verdict([WAVE, WRAITH])
+    v = verdict_text([WAVE, WRAITH])
     assert "finish left more strongly" in v
     assert "can still reflect the throw" in v
     # more-overstable disc (Wraith) is the one that finishes left more strongly
@@ -144,7 +152,7 @@ def test_verdict_equal_stability_uses_direct_flight_language():
              speed=7, glide=5, turn=-1, fade=2)     # more turn, more fade
     b = Disc(name="Beta", brand="Y", category="Fairway Driver",
              speed=7, glide=5, turn=0, fade=1)      # resists turning, gentler
-    v = analysis.compare_verdict([a, b])
+    v = verdict_text([a, b])
     assert "more movement before the fade" not in v          # no contradictory advice
     assert "The Alpha has more turn and more fade." in v
     assert "The Beta resists turning more and finishes more gently." in v
@@ -156,7 +164,7 @@ def test_verdict_no_fabricated_use_split_when_finish_is_same():
              speed=2, glide=3, turn=0, fade=2)
     b = Disc(name="Wizard", brand="Gateway", category="Putter",
              speed=2, glide=5, turn=0, fade=2)
-    v = analysis.compare_verdict([a, b])
+    v = verdict_text([a, b])
     assert "Reach for" not in v
     assert "can still reflect the throw" not in v          # no caveat
     assert "no meaningful finish difference" in v
@@ -165,12 +173,45 @@ def test_verdict_no_fabricated_use_split_when_finish_is_same():
 def test_verdict_three_plus_is_degraded_note():
     third = Disc(name="Firebird", brand="Innova", category="Distance Driver",
                  speed=9, glide=3, turn=0, fade=4)
-    v = analysis.compare_verdict([WAVE, WRAITH, third])
+    v = verdict_text([WAVE, WRAITH, third])
     assert "Key difference:" not in v          # no three-part verdict
     assert "Most similar:" in v
     assert "Most distinct:" in v
     # Wave & Wraith are the closest pair; Firebird the most distinct.
     assert "Wave" in v and "Wraith" in v and "Firebird" in v
+
+
+def test_verdict_returns_structured_fields_for_two_discs():
+    v = analysis.compare_verdict([WAVE, WRAITH])
+    assert v.degraded_note is None
+    assert "same broad distance driver slot" in v.overlap_text.lower()
+    assert "The Wave has more high-speed turn and a gentler finish." in v.key_difference
+    assert "finish left more strongly" in v.how_to_use
+
+
+def test_verdict_structured_contains_no_section_headings():
+    # Headings are presentation and belong to the CLI renderer, not the engine.
+    v = analysis.compare_verdict([WAVE, WRAITH])
+    for text in (v.overlap_text, v.key_difference, v.how_to_use):
+        assert "Bottom line" not in text
+        assert "Overlap:" not in text
+        assert "Key difference:" not in text
+        assert "How to use them:" not in text
+
+
+def test_verdict_three_plus_sets_only_degraded_note():
+    third = Disc(name="Firebird", brand="Innova", category="Distance Driver",
+                 speed=9, glide=3, turn=0, fade=4)
+    v = analysis.compare_verdict([WAVE, WRAITH, third])
+    assert v.overlap_text is None
+    assert v.key_difference is None
+    assert v.how_to_use is None
+    assert "Most similar:" in v.degraded_note
+
+
+def test_verdict_none_for_fewer_than_two_discs():
+    assert analysis.compare_verdict([WAVE]) is None
+    assert analysis.compare_verdict([]) is None
 
 
 # ---------- Unknown-flight discs ----------

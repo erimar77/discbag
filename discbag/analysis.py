@@ -5,6 +5,7 @@ These work on any object exposing ``name``/``brand``/``speed``/``glide``/``turn`
 """
 
 from dataclasses import dataclass
+from typing import Optional
 
 from discbag import roles
 
@@ -183,22 +184,36 @@ def _degraded_note(discs):
             f"Most distinct: {discs[di].name}.")
 
 
+@dataclass(frozen=True)
+class CompareVerdict:
+    """The rule-derived comparison result, as meaning rather than prose.
+
+    Exactly two discs set the three text fields and leave degraded_note None;
+    three or more set only degraded_note.
+    """
+    overlap_text: Optional[str] = None
+    key_difference: Optional[str] = None
+    how_to_use: Optional[str] = None
+    degraded_note: Optional[str] = None
+
+
 def compare_verdict(discs):
     """A rule-derived bottom line. Three-part relative verdict for exactly two
-    discs; a one-line degraded note for 3+; None for fewer than two."""
+    discs; a degraded note for 3+; None for fewer than two.
+
+    Returns structured meaning; the CLI renders it for the terminal.
+    """
     if len(discs) < 2:
         return None
     if not all(roles._manufacturer_complete(d) for d in discs):
         return None
     if len(discs) > 2:
-        return _degraded_note(discs)
+        return CompareVerdict(degraded_note=_degraded_note(discs))
     a, b = discs
-    key_diff = _trait_sentence(a, b) + " " + _trait_sentence(b, a)
-    return (
-        "Bottom line\n\n"
-        f"Overlap:\n{_overlap_text(a, b)}\n\n"
-        f"Key difference:\n{key_diff}\n\n"
-        f"How to use them:\n{_how_to_use_text(a, b)}"
+    return CompareVerdict(
+        overlap_text=_overlap_text(a, b),
+        key_difference=_trait_sentence(a, b) + " " + _trait_sentence(b, a),
+        how_to_use=_how_to_use_text(a, b),
     )
 
 

@@ -1290,6 +1290,18 @@ def _ownership_footer(discs):
     return line
 
 
+def render_compare_verdict(verdict):
+    """The terminal form of a CompareVerdict. Presentation lives here, not in the engine."""
+    if verdict.degraded_note is not None:
+        return verdict.degraded_note
+    return (
+        "Bottom line\n\n"
+        f"Overlap:\n{verdict.overlap_text}\n\n"
+        f"Key difference:\n{verdict.key_difference}\n\n"
+        f"How to use them:\n{verdict.how_to_use}"
+    )
+
+
 def cmd_compare(args, inv):
     from discbag import analysis
     db_discs = db.load_db().get("discs", [])
@@ -1304,7 +1316,7 @@ def cmd_compare(args, inv):
     verdict = analysis.compare_verdict(discs)
     if verdict:
         print()
-        print(verdict)
+        print(render_compare_verdict(verdict))
     footer = _ownership_footer(discs)
     if footer:
         print()
