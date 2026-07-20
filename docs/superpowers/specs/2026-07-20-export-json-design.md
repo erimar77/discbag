@@ -361,6 +361,10 @@ value in it (flight numbers, stability, role) is already present in the disc's `
 Exporting it would put terminal formatting into a contract that forbids presentation, and
 duplicate data the snapshot already carries.
 
+> Consumers that require tabular comparisons should derive presentation from the referenced
+> inventory records. The pairwise record intentionally contains only analysis unique to the
+> relationship between the two discs.
+
 `degraded_note` is always `null` here, since pairwise comparison is always exactly two discs. The
 field is retained so the shape matches the engine's dataclass.
 
@@ -536,12 +540,3 @@ add to a later export schema revision.
 
 Prefer backward-compatible optional field additions when practical. **Never silently change the
 semantics of an existing field** — that requires a schema version bump.
-
----
-
-## Open item for spec review
-
-The `compare()` table is omitted from `pairwise_comparisons` (rationale above: it is presentation,
-and its data is already in `inventory`). The approving message included a `"comparison": {}` key in
-its illustrative JSON without addressing the omission argument. **Confirm the table should be
-omitted**, or state what it should carry if not.
