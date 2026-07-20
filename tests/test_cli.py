@@ -1163,6 +1163,26 @@ def test_export_help_warns_that_snapshots_contain_personal_data(capsys):
     assert "history" in help_text
 
 
+def test_cmd_export_reports_a_catalog_id_collision_cleanly(tmp_path, capsys):
+    # catalog_id is derived from brand+name and is not injective (see
+    # discbag/export.py:_add_to_catalog_map). Two owned discs landing on the
+    # same id with genuinely different data must fail the export with a
+    # readable message and exit code 1 -- never an uncaught traceback.
+    from discbag import inventory
+    inv = inventory.Inventory(path=tmp_path / "inventory.json")
+    inv.add(OwnedDisc.from_db_record(
+        {"name": "B C", "brand": "A", "category": "Putter",
+         "speed": 5, "glide": 5, "turn": 0, "fade": 0, "stability": "Stable"}))
+    inv.add(OwnedDisc.from_db_record(
+        {"name": "C", "brand": "A B", "category": "Putter",
+         "speed": 9, "glide": 3, "turn": -1, "fade": 1, "stability": "Overstable"}))
+    rc = cli.cmd_export(_ns(output=None, indent=2), inv)
+    assert rc == 1
+    err = capsys.readouterr().err
+    assert "a-b-c" in err
+    assert "Export failed" in err
+
+
 def test_cmd_export_normalizes_unset_profile_to_none(tmp_path, capsys, monkeypatch):
     from discbag import player
     real_load_profile = player.load_profile

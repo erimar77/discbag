@@ -10,7 +10,11 @@ All notable changes to this project are documented here. The format is based on
 - `discbag export` — a portable, deterministic JSON snapshot (schema v1.0) of your collection and
   every computed analysis (coverage, gaps, overlap groups, pairwise comparisons, goal and scenario
   bags, maturity, next purchase, and exclusions), for consumption by external tools.
-- `db.catalog_id()` — stable brand+name identifier for catalog molds.
+- `db.catalog_id()` — stable brand+name identifier for catalog molds. Not guaranteed injective
+  (distinct brand/name pairs can theoretically slug to the same id); `discbag export` now detects
+  a genuine collision — two molds resolving to the same id with different data — and fails the
+  export with a clear error naming both, instead of silently merging them into one catalog entry.
+  The id format itself is unchanged and frozen for schema v1.x.
 - `roles.canonical_situations()` — the distinct situations and the aliases that resolve onto them.
 - Prototype / partially-known molds. `add --prototype` authors a **local mold** that isn't in the
   catalog — a manufacturer prototype you own — with whatever flight numbers have been published so

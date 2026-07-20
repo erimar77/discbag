@@ -1670,13 +1670,17 @@ def cmd_export(args, inv):
 
     prof = player.load_profile()
     profile = None if prof.is_empty() else prof
-    payload = export.build_export(
-        inv.all_discs(),
-        profile,
-        db.load_db().get("discs", []),
-        analysis_date=date.today(),
-        generated_at=datetime.now(timezone.utc),
-    )
+    try:
+        payload = export.build_export(
+            inv.all_discs(),
+            profile,
+            db.load_db().get("discs", []),
+            analysis_date=date.today(),
+            generated_at=datetime.now(timezone.utc),
+        )
+    except ValueError as exc:
+        print(f"Export failed: {exc}", file=sys.stderr)
+        return 1
     text = json.dumps(payload, indent=args.indent, sort_keys=True)
     if args.output:
         Path(args.output).write_text(text + "\n")

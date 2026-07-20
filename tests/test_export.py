@@ -1,6 +1,8 @@
 from datetime import date, datetime
 
-from discbag import export, recommend
+import pytest
+
+from discbag import db, export, recommend
 from discbag.inventory import OwnedDisc
 from discbag.player import PlayerProfile
 
@@ -219,19 +221,49 @@ def test_catalog_map_excludes_unreferenced_records():
     assert "innova-destroyer" not in out["catalog"]
 
 
-def test_catalog_map_winner_is_stable_regardless_of_inventory_order():
+def test_catalog_map_deduplicates_identical_summaries_without_error():
+    # Two owned discs of the exact same mold with identical cached data --
+    # e.g. two physical copies of the same disc -- must collapse into ONE
+    # catalog entry and must not be treated as a collision. This is the
+    # ordinary, constant case: it happens every time a mold is owned twice.
+    a = owned(disc_id="id-1", speed=2, glide=3, turn=0, fade=2)
+    b = owned(disc_id="id-2", speed=2, glide=3, turn=0, fade=2)
+    out = build([a, b])
+    assert list(out["catalog"]) == ["gateway-wizard"]
+    assert out["catalog"]["gateway-wizard"]["flight"] == {
+        "speed": 2, "glide": 3, "turn": 0, "fade": 2}
+
+
+def test_catalog_map_raises_when_the_same_catalog_id_carries_different_data():
     # Two owned discs share a catalog_id (same brand + mold name) but carry
     # different cached flight numbers -- e.g. one locally-authored, one
-    # catalog-sourced under the same brand+name. Whichever record "wins" the
-    # catalog map's summary must be determined by inventory_id order (the
-    # same ordering `inventory` records are sorted by), not by whatever
-    # order the caller happened to pass the `inventory` list in.
+    # catalog-sourced under the same brand+name. There is no correct way to
+    # pick a winner between two genuinely different summaries, so this must
+    # fail loudly (regardless of which order the discs are passed in) rather
+    # than silently keeping one and dropping the other.
     low_id = owned(disc_id="id-a", speed=2, glide=3, turn=0, fade=2)
     high_id = owned(disc_id="id-b", speed=9, glide=3, turn=-1, fade=1)
-    forward = build([low_id, high_id])["catalog"]["gateway-wizard"]
-    backward = build([high_id, low_id])["catalog"]["gateway-wizard"]
-    assert forward == backward
-    assert forward["flight"] == {"speed": 2, "glide": 3, "turn": 0, "fade": 2}
+    for pair in ([low_id, high_id], [high_id, low_id]):
+        with pytest.raises(ValueError, match="gateway-wizard"):
+            build(pair)
+
+
+def test_catalog_map_raises_on_a_true_catalog_id_slug_collision():
+    # catalog_id is derived from brand + name and is NOT injective: brand
+    # "A" + name "B C" and brand "A B" + name "C" both slug to "a-b-c". Two
+    # owned discs landing on opposite sides of that boundary, with differing
+    # flight numbers, must be caught -- not silently merged into one entry.
+    left = owned(disc_id="id-left", brand="A", name="B C",
+                 speed=5, glide=5, turn=0, fade=0)
+    right = owned(disc_id="id-right", brand="A B", name="C",
+                  speed=9, glide=3, turn=-1, fade=1)
+    assert db.catalog_id(left) == db.catalog_id(right) == "a-b-c"  # confirm the fixture collides
+
+    with pytest.raises(ValueError, match="a-b-c") as excinfo:
+        build([left, right])
+    message = str(excinfo.value)
+    assert "'A' 'B C'" in message      # names the first colliding mold
+    assert "'A B' 'C'" in message      # names the second colliding mold
 
 
 # ---------- coverage / gaps ----------

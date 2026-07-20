@@ -437,6 +437,11 @@ Three conventions worth knowing when consuming an export:
   `scenario_aliases` maps `rain` and `travel` onto them. Resolve through the alias map.
 - `catalog[].flight` is always the mold's manufacturer numbers; a user's own recorded
   numbers live only in `inventory[].computed.effective_flight`.
+- `catalog_id` is **stable for schema v1.x**: treat it as an opaque string, never parse it or
+  reconstruct a brand/mold name from it. It is derived from brand + name and is not guaranteed
+  unique across every possible mold; a genuine collision fails the export outright rather than
+  silently merging two molds into one entry. A future, incompatible id format is a schema-version
+  change, not a silent change to ids already in use.
 
 Discs the engine can't fully evaluate stay visible in `inventory` but sit out the analyses they're
 excluded from — archived discs, discs with incomplete flight data, and discs with recorded personal

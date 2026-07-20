@@ -162,6 +162,39 @@ def _coverage_entry(rc):
     }
 
 
+def _add_to_catalog_map(catalog_map, disc):
+    """Add disc's portable summary to catalog_map, keyed by catalog_id.
+
+    db.catalog_id is derived from brand + name and is NOT injective: two
+    different brand/name pairs can slug to the same id (e.g. "A"/"B C" and
+    "A B"/"C" both give "a-b-c"). Reaching the same id twice with an
+    IDENTICAL summary is normal and constant -- it's the same mold seen
+    through two owned copies, or through both an owned disc and a
+    next-purchase candidate. Reaching the same id twice with a DIFFERENT
+    summary means two distinct molds silently collided under one id, which
+    would merge them into a single, wrong catalog entry. There is no correct
+    way to pick a winner, so this fails loudly instead of guessing one.
+
+    Returns the catalog_id, so callers that already need it don't recompute it.
+    """
+    cid = db.catalog_id(disc)
+    summary = _catalog_summary(disc)
+    existing = catalog_map.get(cid)
+    if existing is None:
+        catalog_map[cid] = summary
+    elif existing != summary:
+        raise ValueError(
+            f"catalog_id collision: {cid!r} was derived from two different "
+            f"molds -- {existing['brand']!r} {existing['name']!r} "
+            f"(flight {existing['flight']}) and {summary['brand']!r} "
+            f"{summary['name']!r} (flight {summary['flight']}). catalog_id is "
+            "derived from brand+name and is not guaranteed unique across the "
+            "catalog; this export cannot proceed until the collision is "
+            "resolved upstream (e.g. by correcting one mold's recorded name)."
+        )
+    return cid
+
+
 def _next_purchase(active, catalog_discs, profile, catalog_map):
     """The engine's single most valuable purchase, with its reasoning. Candidate
     molds are not owned, so their portable summaries join the catalog map."""
@@ -170,8 +203,7 @@ def _next_purchase(active, catalog_discs, profile, catalog_map):
         return None
     candidates = []
     for pick in result.candidates:
-        cid = db.catalog_id(pick.disc)
-        catalog_map.setdefault(cid, _catalog_summary(pick.disc))
+        cid = _add_to_catalog_map(catalog_map, pick.disc)
         candidates.append({"catalog_id": cid, "fit_score": pick.score})
     return {
         "role": result.coverage.role.name,
@@ -310,13 +342,15 @@ def build_export(inventory, profile, catalog, *, analysis_date, generated_at):
     """
     records = sorted((_inventory_record(d, profile) for d in inventory),
                      key=lambda r: r["inventory_id"])
-    # setdefault is first-wins: if two owned discs share a catalog_id but carry
-    # differing cached mold data, the winner must not depend on the caller's
-    # inventory order. Walk the same inventory_id ordering used for `records`
-    # above so the result is stable regardless of how `inventory` was passed in.
+    # Two owned discs sharing a catalog_id with an identical summary merge
+    # silently (the same mold, reached twice) -- see _add_to_catalog_map for
+    # why a *differing* summary instead raises. Walk the same inventory_id
+    # ordering used for `records` above so which pair is compared first (and
+    # thus which error a genuine collision reports) is stable regardless of
+    # how `inventory` was passed in.
     catalog_map = {}
     for disc in sorted(inventory, key=lambda d: d.id):
-        catalog_map.setdefault(db.catalog_id(disc), _catalog_summary(disc))
+        _add_to_catalog_map(catalog_map, disc)
 
     active = [d for d in inventory if d.user.is_active]
     catalog_discs = [Disc.from_db_record(r) for r in catalog]
