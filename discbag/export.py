@@ -244,26 +244,51 @@ def _pairwise_comparisons(active):
 # Reports each exclusion reason actually keeps a disc out of. Verified against
 # real engine behavior — a disc is never claimed to be excluded from a report
 # the engine in fact includes it in.
+#
+# `gaps` and `next_purchase` are deliberately absent from every list below:
+# neither is keyed by owned-disc inventory_id. `gaps` lists uncovered roles
+# (always an empty disc list); `next_purchase` names a recommended unowned
+# catalog mold by catalog_id. An owned disc's inventory_id can never appear
+# in either, so no exclusion claim about them is checkable.
 _INCOMPLETE_FLIGHT_REPORTS = ["coverage", "goal_bags", "scenario_bags",
                               "overlap_groups", "pairwise_comparisons"]
-_INACTIVE_REPORTS = ["coverage", "gaps", "goal_bags", "scenario_bags",
-                     "overlap_groups", "pairwise_comparisons", "next_purchase"]
+# Currently identical to _INCOMPLETE_FLIGHT_REPORTS above — that's a coincidence
+# of today's engine, not a documented equivalence. Keep the two lists separate:
+# they assert different facts (inactive vs. flight-incomplete) and could
+# diverge if either mechanism changes.
+_INACTIVE_REPORTS = ["coverage", "goal_bags", "scenario_bags",
+                     "overlap_groups", "pairwise_comparisons"]
+# pairwise_comparisons alone gates on manufacturer-completeness
+# (roles._manufacturer_complete via analysis.compare_verdict), not on
+# flight_known. A disc with a complete personal_flight but no published
+# manufacturer numbers passes flight_known and appears in every other report,
+# but compare_verdict() still declines to judge it. disc.cached.has_flight is
+# the public equivalent of roles._manufacturer_complete for an OwnedDisc: both
+# delegate to the same four cached mold fields (speed/glide/turn/fade).
+_MANUFACTURER_INCOMPLETE_REPORTS = ["pairwise_comparisons"]
 
 
 def _exclusions(inventory):
     """Which owned discs the engine leaves out of which reports, and why.
 
     Excluded discs stay visible in `inventory`; only their analysis
-    participation is limited.
+    participation is limited. A disc can genuinely have more than one reason
+    apply (e.g. inactive AND flight-incomplete) — every reason that actually
+    holds gets its own entry, not just the first one checked.
     """
     out = []
     for disc in inventory:
         if not disc.user.is_active:
             out.append({"inventory_id": disc.id, "reason": "inactive_status",
                         "excluded_from": list(_INACTIVE_REPORTS)})
-        elif not roles.flight_known(disc):
+        if not roles.flight_known(disc):
             out.append({"inventory_id": disc.id, "reason": "incomplete_flight_data",
                         "excluded_from": list(_INCOMPLETE_FLIGHT_REPORTS)})
+        elif not disc.cached.has_flight:
+            # flight_known is True here (personal_flight covers it), but the
+            # manufacturer numbers pairwise_comparisons actually gates on are not.
+            out.append({"inventory_id": disc.id, "reason": "incomplete_manufacturer_data",
+                        "excluded_from": list(_MANUFACTURER_INCOMPLETE_REPORTS)})
     return sorted(out, key=lambda e: (e["inventory_id"], e["reason"]))
 
 

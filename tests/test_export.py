@@ -473,3 +473,42 @@ def test_exclusions_are_sorted_by_id_then_reason():
 
 def test_no_exclusions_when_every_disc_participates():
     assert build([owned()])["analysis"]["exclusions"] == []
+
+
+def test_manufacturer_incomplete_disc_is_excluded_from_pairwise_only():
+    """flight_known is True (via personal_flight), so this disc is NOT
+    incomplete_flight_data and DOES appear in coverage. But compare_verdict()
+    gates on manufacturer completeness, not flight_known, so pairwise_comparisons
+    silently drops it unless _exclusions reports incomplete_manufacturer_data."""
+    from tests.conftest import prototype_disc
+    d = prototype_disc()
+    d.id = "id-proto"
+    out = build([owned(), d])
+
+    entry = next(e for e in out["analysis"]["exclusions"]
+                 if e["inventory_id"] == "id-proto")
+    assert entry["reason"] == "incomplete_manufacturer_data"
+    assert entry["excluded_from"] == ["pairwise_comparisons"]
+
+    # The two conditions are genuinely distinct: this disc still appears in
+    # coverage because flight_known(d) is True.
+    covered_ids = {i for rc in out["analysis"]["coverage"] for i in rc["disc_ids"]}
+    assert "id-proto" in covered_ids
+
+
+def test_disc_that_is_both_inactive_and_flight_unknown_gets_both_reasons():
+    d = unknown_flight_disc()
+    d.user.status = "lost"
+    out = build([d])
+    reasons = {e["reason"] for e in out["analysis"]["exclusions"]
+               if e["inventory_id"] == "id-unknown"}
+    assert reasons == {"inactive_status", "incomplete_flight_data"}
+
+
+def test_no_exclusion_names_gaps_or_next_purchase():
+    d = unknown_flight_disc()
+    d.user.status = "lost"
+    out = build([owned(), d, owned(disc_id="id-lost2", status="lost")])
+    for entry in out["analysis"]["exclusions"]:
+        assert "gaps" not in entry["excluded_from"]
+        assert "next_purchase" not in entry["excluded_from"]
