@@ -447,6 +447,13 @@ def test_top_level_help_is_grouped(tmp_path):
         assert group in help_text
 
 
+def test_top_level_help_lists_export(tmp_path):
+    # Regression: export was registered as a subcommand but omitted from
+    # _HELP_GROUPS, so it never showed up in `discbag --help`.
+    help_text = cli.build_parser().format_help()
+    assert "export" in help_text
+
+
 def test_subcommand_help_still_works():
     # build-bag --help exits (argparse) after printing its own help — unchanged behavior.
     import pytest
@@ -1154,3 +1161,16 @@ def test_export_help_warns_that_snapshots_contain_personal_data(capsys):
     help_text = capsys.readouterr().out.lower()
     assert "personal" in help_text
     assert "history" in help_text
+
+
+def test_cmd_export_normalizes_unset_profile_to_none(tmp_path, capsys, monkeypatch):
+    from discbag import player
+    real_load_profile = player.load_profile
+    # Hermetic: point load_profile at a path that has no profile.json, rather than
+    # relying on (or risking) the real ~/.discbag/profile.json on the dev's machine.
+    monkeypatch.setattr(cli.player, "load_profile",
+                         lambda: real_load_profile(tmp_path / "no_such_profile.json"))
+    inv = _inv_with_mako(tmp_path)
+    assert cli.cmd_export(_ns(output=None, indent=2), inv) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["profile"] is None

@@ -1670,9 +1670,11 @@ def cmd_export(args, inv):
 
     from discbag import export
 
+    prof = player.load_profile()
+    profile = None if prof.is_empty() else prof
     payload = export.build_export(
         inv.all_discs(),
-        player.load_profile(),
+        profile,
         db.load_db().get("discs", []),
         analysis_date=date.today(),
         generated_at=datetime.now(timezone.utc),
@@ -1728,6 +1730,7 @@ _HELP_GROUPS = [
         ("sync", "refresh cached manufacturer data"),
         ("updatedb", "refresh the disc database"),
         ("db-info", "database size and age"),
+        ("export", "portable JSON snapshot for external tools"),
     ]),
 ]
 
