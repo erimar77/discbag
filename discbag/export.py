@@ -12,7 +12,7 @@ what makes build_export() deterministic and byte-reproducible in tests.
 
 from dataclasses import asdict
 
-from discbag import __version__
+from discbag import __version__, db, player, roles
 
 SCHEMA_VERSION = "1.0"
 
@@ -60,6 +60,89 @@ def _empty_analysis():
     }
 
 
+def _flight_dict(flight):
+    """A Flight (or None) as JSON-safe numbers."""
+    if flight is None:
+        return None
+    return {"speed": flight.speed, "glide": flight.glide,
+            "turn": flight.turn, "fade": flight.fade}
+
+
+def _catalog_summary(disc):
+    """The deliberate portable summary of a mold, defined by the public schema.
+
+    Deliberately not a dump of the internal catalog object: an export must
+    render on a machine with no discs.json.
+    """
+    return {
+        "catalog_id": db.catalog_id(disc),
+        "name": disc.name,
+        "brand": disc.brand,
+        "category": disc.category,
+        "stability": disc.stability,
+        "flight": _flight_dict(roles.effective_flight(disc)) if roles.flight_known(disc)
+                  else {"speed": disc.speed, "glide": disc.glide,
+                        "turn": disc.turn, "fade": disc.fade},
+    }
+
+
+def _computed(disc, profile):
+    """Engine conclusions about one disc. Every value is an existing engine
+    result; unavailable ones are None rather than a substitute."""
+    known = roles.flight_known(disc)
+    if not known:
+        return {"flight_known": False, "effective_flight": None, "behaves_flight": None,
+                "stability": None, "primary_role": None, "fit_score": None,
+                "required_power": None}
+    effective = roles.effective_flight(disc)
+    role = roles.primary_role(disc)
+    return {
+        "flight_known": True,
+        "effective_flight": _flight_dict(effective),
+        "behaves_flight": _flight_dict(roles.behaves_flight(disc, profile)),
+        "stability": roles.stability_number(disc),
+        "primary_role": role.name,
+        # A weighted distance from the role's ideal: LOWER IS BETTER, unbounded.
+        "fit_score": roles.fit_score(disc, role),
+        "required_power": player.required_power(effective),
+    }
+
+
+def _history_summary(disc):
+    u = disc.user
+    # Compute last_used as the max date from all uses (or use the stored field if available).
+    dates = [e["date"] for e in u.uses if e["date"]]
+    last_used = max(dates) if dates else u.last_used
+    return {
+        "rounds": u.round_count,
+        "practices": u.practice_count,
+        "use_count": u.use_count,
+        "first_used": u.first_used,
+        "last_used": last_used,
+        "last_round": u.last_round,
+        "last_practice": u.last_practice,
+        "acquired": u.date_added,
+    }
+
+
+def _inventory_record(disc, profile):
+    return {
+        "inventory_id": disc.id,
+        "catalog_id": db.catalog_id(disc),
+        "mold": disc.mold,
+        "manufacturer": {
+            "brand": disc.brand,
+            "category": disc.category,
+            "stability": disc.stability,
+            "flight": {"speed": disc.speed, "glide": disc.glide,
+                       "turn": disc.turn, "fade": disc.fade},
+        },
+        "user": asdict(disc.user),
+        "computed": _computed(disc, profile),
+        "history_summary": _history_summary(disc),
+    }
+
+
 def build_export(inventory, profile, catalog, *, analysis_date, generated_at):
     """A complete, deterministic snapshot of the collection and its analysis.
 
@@ -69,6 +152,12 @@ def build_export(inventory, profile, catalog, *, analysis_date, generated_at):
     analysis_date -- datetime.date driving date-sensitive analysis
     generated_at  -- datetime.datetime recorded as provenance only
     """
+    records = sorted((_inventory_record(d, profile) for d in inventory),
+                     key=lambda r: r["inventory_id"])
+    catalog_map = {}
+    for disc in inventory:
+        catalog_map.setdefault(db.catalog_id(disc), _catalog_summary(disc))
+
     return {
         "schema_version": SCHEMA_VERSION,
         "generated_at": _iso_z(generated_at),
@@ -76,7 +165,7 @@ def build_export(inventory, profile, catalog, *, analysis_date, generated_at):
         "analysis_defaults": dict(ANALYSIS_DEFAULTS),
         "reports_included": list(REPORTS_INCLUDED),
         "profile": _profile_dict(profile),
-        "catalog": {},
-        "inventory": [],
+        "catalog": catalog_map,
+        "inventory": records,
         "analysis": _empty_analysis(),
     }

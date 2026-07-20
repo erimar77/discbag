@@ -101,3 +101,99 @@ def test_export_never_calls_datetime_now():
     # Two calls with identical injected clocks must agree on every time field.
     first, second = build(), build()
     assert first["generated_at"] == second["generated_at"]
+
+
+# ---------- inventory records ----------
+
+def test_inventory_record_uses_the_existing_disc_id():
+    out = build([owned(disc_id="1683a68e94dd4d1e913fb05f0fbacf32")])
+    assert out["inventory"][0]["inventory_id"] == "1683a68e94dd4d1e913fb05f0fbacf32"
+
+
+def test_inventory_record_separates_manufacturer_user_and_computed():
+    out = build([owned(plastic="Firm", weight=175, favorite=True)])
+    rec = out["inventory"][0]
+    assert rec["mold"] == "Wizard"
+    assert rec["catalog_id"] == "gateway-wizard"
+    assert rec["manufacturer"]["brand"] == "Gateway"
+    assert rec["manufacturer"]["flight"] == {"speed": 2, "glide": 3, "turn": 0, "fade": 2}
+    assert rec["user"]["plastic"] == "Firm"
+    assert rec["user"]["weight"] == 175
+    assert rec["user"]["favorite"] is True
+    assert rec["computed"]["flight_known"] is True
+
+
+def test_computed_carries_both_flight_views():
+    # effective_flight drives roles/fit; behaves_flight drives overlap/choose/practice.
+    rec = build([owned()])["inventory"][0]
+    assert rec["computed"]["effective_flight"] == {"speed": 2, "glide": 3, "turn": 0, "fade": 2}
+    assert set(rec["computed"]["behaves_flight"]) == {"speed", "glide", "turn", "fade"}
+
+
+def test_computed_carries_role_fit_stability_and_power():
+    rec = build([owned()])["inventory"][0]
+    assert rec["computed"]["primary_role"] == "Putting"
+    assert isinstance(rec["computed"]["fit_score"], float)
+    assert rec["computed"]["stability"] == 2          # turn 0 + fade 2
+    assert isinstance(rec["computed"]["required_power"], float)
+
+
+def test_history_summary_counts_rounds_and_practices():
+    d = owned(use_dates=[{"date": "2026-07-07", "session_type": "round"},
+                         {"date": "2026-07-01", "session_type": "practice"}],
+              date_added="2025-03-11")
+    rec = build([d])["inventory"][0]
+    assert rec["history_summary"]["rounds"] == 1
+    assert rec["history_summary"]["practices"] == 1
+    assert rec["history_summary"]["last_used"] == "2026-07-07"
+    assert rec["history_summary"]["acquired"] == "2025-03-11"
+
+
+def test_incomplete_flight_disc_stays_visible_with_nulled_computed_fields():
+    from tests.conftest import prototype_disc
+    d = prototype_disc()
+    d.id = "id-proto"
+    d.user.personal_flight = None       # nothing recorded: genuinely unknown
+    rec = build([d])["inventory"][0]
+    assert rec["inventory_id"] == "id-proto"          # present, not dropped
+    assert rec["computed"]["flight_known"] is False
+    assert rec["computed"]["effective_flight"] is None
+    assert rec["computed"]["primary_role"] is None
+    assert rec["computed"]["fit_score"] is None
+
+
+def test_archived_disc_stays_visible_with_its_status():
+    rec = build([owned(status="lost", status_reason="creek")])["inventory"][0]
+    assert rec["user"]["status"] == "lost"
+    assert rec["user"]["status_reason"] == "creek"
+
+
+def test_inventory_is_sorted_by_inventory_id():
+    out = build([owned(disc_id="id-c"), owned(disc_id="id-a"), owned(disc_id="id-b")])
+    assert [r["inventory_id"] for r in out["inventory"]] == ["id-a", "id-b", "id-c"]
+
+
+# ---------- portable catalog map ----------
+
+def test_catalog_map_holds_a_portable_summary_for_each_owned_mold():
+    out = build([owned()])
+    assert out["catalog"]["gateway-wizard"] == {
+        "catalog_id": "gateway-wizard",
+        "name": "Wizard",
+        "brand": "Gateway",
+        "category": "Putter",
+        "stability": "",
+        "flight": {"speed": 2, "glide": 3, "turn": 0, "fade": 2},
+    }
+
+
+def test_catalog_map_deduplicates_repeated_molds():
+    out = build([owned(disc_id="id-1"), owned(disc_id="id-2")])
+    assert list(out["catalog"]) == ["gateway-wizard"]
+
+
+def test_catalog_map_excludes_unreferenced_records():
+    unreferenced = {"name": "Destroyer", "brand": "Innova", "category": "Distance Driver",
+                    "stability": "Overstable", "speed": 12, "glide": 5, "turn": -1, "fade": 3}
+    out = build([owned()], catalog=[unreferenced])
+    assert "innova-destroyer" not in out["catalog"]
