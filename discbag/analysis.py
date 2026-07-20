@@ -190,8 +190,13 @@ def _degraded_note(discs):
     # total distance to the others. min()+negated distance so a tie resolves
     # to the alphabetically-first disc, consistent with every sorted() site.
     di = min(idx, key=lambda i: (-dist_total(i), key(i)))
-    a, b = (discs[ci], discs[cj]) if key(ci) <= key(cj) else (discs[cj], discs[ci])
-    return (f"Most similar: {a.name} and {b.name}. "
+    # Naming order is index order (ci < cj, since every pair is built with
+    # i < j), exactly as before the tiebreak was added — NOT sorted by
+    # identity key. The identity key above breaks a tie in which PAIR is
+    # selected; it must not also reorder the two names within the chosen
+    # pair, or user-visible "A and B" order would be driven by the opaque
+    # inventory id instead of the discs' original list order.
+    return (f"Most similar: {discs[ci].name} and {discs[cj].name}. "
             f"Most distinct: {discs[di].name}.")
 
 

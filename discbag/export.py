@@ -76,6 +76,14 @@ def _catalog_summary(disc):
 
     Deliberately not a dump of the internal catalog object: an export must
     render on a machine with no discs.json.
+
+    `flight` here is always the mold's own cached/manufacturer numbers, raw
+    from the disc record — never `roles.effective_flight()`, which for an
+    OWNED disc can return the user's personal_flight. catalog_map is keyed by
+    catalog_id, so the same mold must report the same numbers regardless of
+    whether it happens to reach this function via an owned disc or a bare
+    catalog record; personal numbers belong only in that disc's own
+    `inventory[].computed.effective_flight`.
     """
     return {
         "catalog_id": db.catalog_id(disc),
@@ -83,9 +91,8 @@ def _catalog_summary(disc):
         "brand": disc.brand,
         "category": disc.category,
         "stability": disc.stability,
-        "flight": _flight_dict(roles.effective_flight(disc)) if roles.flight_known(disc)
-                  else {"speed": disc.speed, "glide": disc.glide,
-                        "turn": disc.turn, "fade": disc.fade},
+        "flight": {"speed": disc.speed, "glide": disc.glide,
+                   "turn": disc.turn, "fade": disc.fade},
     }
 
 
@@ -165,7 +172,7 @@ def _next_purchase(active, catalog_discs, profile, catalog_map):
     for pick in result.candidates:
         cid = db.catalog_id(pick.disc)
         catalog_map.setdefault(cid, _catalog_summary(pick.disc))
-        candidates.append({"catalog_id": cid, "score": pick.score})
+        candidates.append({"catalog_id": cid, "fit_score": pick.score})
     return {
         "role": result.coverage.role.name,
         "priority": result.coverage.priority,

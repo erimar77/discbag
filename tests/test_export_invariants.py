@@ -158,10 +158,17 @@ def _referenced_catalog_ids(payload):
 
 
 def test_every_referenced_catalog_id_has_an_embedded_summary():
-    catalog = [{"name": "Firebird", "brand": "Innova", "category": "Distance Driver",
-                "stability": "Very Overstable", "speed": 9, "glide": 3, "turn": 0, "fade": 4}]
+    # Must be a mold that actually qualifies as a next_purchase candidate (a
+    # Firebird here never does — see tests/test_export.py:257-258 for the
+    # same swap, made once already but not here), or next_purchase.candidates
+    # stays empty, _referenced_catalog_ids() returns set(), and `set() <=
+    # anything` passes trivially without exercising the invariant at all.
+    catalog = [{"name": "Roc3", "brand": "Innova", "category": "Midrange",
+                "stability": "Understable", "speed": 5, "glide": 4, "turn": 0, "fade": 1}]
     payload = build(twins(), catalog=catalog)
-    assert _referenced_catalog_ids(payload) <= set(payload["catalog"])
+    referenced = _referenced_catalog_ids(payload)
+    assert referenced          # guard against this test silently going vacuous again
+    assert referenced <= set(payload["catalog"])
 
 
 def test_inventory_catalog_ids_are_also_embedded():
@@ -187,7 +194,7 @@ def _referenced_inventory_ids(payload):
                 if key in {"inventory_id", "disc_id", "left_inventory_id",
                            "right_inventory_id"} and isinstance(value, str):
                     found.add(value)
-                elif key == "inventory_ids":
+                elif key in {"inventory_ids", "disc_ids"}:
                     found.update(value)
                 else:
                     walk(value)

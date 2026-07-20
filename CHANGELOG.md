@@ -84,7 +84,13 @@ All notable changes to this project are documented here. The format is based on
 - Ranking ties are now broken deterministically by disc identity, never by input/inventory order.
   When two discs score exactly the same, the previous winner depended on list order — reversing
   your inventory could silently change which disc filled a role. Affects `build-bag`, `recommend`,
-  `choose`, `practice`, `maturity`, and chart listings, in tie cases only.
+  `choose`, `practice`, and chart listings, in tie cases only. `compare`'s "Most similar" pair is
+  now chosen the same way: which PAIR is named no longer depends on input order when two disc-pairs
+  tie exactly on flight distance (the two names *within* that pair still print in input order, as
+  before). `maturity`'s usage insights go further than a tiebreak: `_primary_backup_insight` and
+  `_category_leader_insight` now walk categories in a fixed (alphabetical) order rather than bag
+  insertion order, so which insight gets reported can change even with no numeric tie at all —
+  not just in tie cases.
 - `analysis.compare_verdict()` now returns a structured `CompareVerdict` rather than pre-formatted
   text; the CLI renders it. Terminal output is unchanged.
 - `round-used` is now the primary verb for recording a round; `used` is documented as its

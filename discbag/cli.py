@@ -1666,8 +1666,6 @@ def cmd_flight(args, inv):
 
 def cmd_export(args, inv):
     """Write a portable JSON snapshot of the collection and its analysis."""
-    from datetime import date, datetime, timezone
-
     from discbag import export
 
     prof = player.load_profile()

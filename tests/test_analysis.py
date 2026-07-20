@@ -214,13 +214,20 @@ def test_verdict_none_for_fewer_than_two_discs():
     assert analysis.compare_verdict([]) is None
 
 
-def test_degraded_note_is_order_independent_on_ties():
+def test_degraded_note_pair_selection_is_order_independent_on_ties():
     # Four discs on a line (by speed only -- glide/turn/fade held equal) built
     # so the two endpoints tie for "most distinct" (max total flight-distance
     # to the other three), and the two closest neighbor-pairs also tie for
-    # "most similar". Before the fix, both `min(pairs, ...)` and
-    # `max(idx, key=dist_total)` broke ties by list position (bag order), not
-    # disc identity, so reversing the bag could change the reported note.
+    # "most similar" (Alpha-Bravo at distance 1, Charlie-Delta at distance 1).
+    # WHICH pair is reported, and which single disc is "most distinct", must
+    # not depend on bag order -- that's what disc_identity_key's tiebreak is
+    # for. It does NOT promise the two names *within* the selected pair print
+    # in the same order regardless of bag order: naming order is plain list-
+    # position order (as it was pre-tiebreak), and reversing the bag reverses
+    # which of the pair's two discs is encountered first. That is intentional
+    # -- see _degraded_note's comment on why the identity key must not also
+    # decide print order within the pair (that reordered every non-tied
+    # 3+-disc comparison too, not just ties).
     alpha = Disc(name="Alpha", brand="X", category="Putter",
                 speed=1, glide=3, turn=0, fade=0)
     bravo = Disc(name="Bravo", brand="X", category="Putter",
@@ -231,9 +238,16 @@ def test_degraded_note_is_order_independent_on_ties():
                 speed=9, glide=3, turn=0, fade=0)
     bag = [alpha, bravo, charlie, delta]
 
+    import re
+    pattern = re.compile(r"Most similar: (\w+) and (\w+)\. Most distinct: (\w+)\.")
+
     forward = analysis.compare_verdict(bag).degraded_note
     reverse = analysis.compare_verdict(list(reversed(bag))).degraded_note
-    assert forward == reverse
+    fwd_a, fwd_b, fwd_distinct = pattern.match(forward).groups()
+    rev_a, rev_b, rev_distinct = pattern.match(reverse).groups()
+
+    assert {fwd_a, fwd_b} == {rev_a, rev_b} == {"Alpha", "Bravo"}
+    assert fwd_distinct == rev_distinct == "Alpha"
 
 
 # ---------- Unknown-flight discs ----------

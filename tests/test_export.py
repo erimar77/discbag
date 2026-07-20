@@ -97,8 +97,12 @@ def test_empty_reports_use_empty_containers_not_null():
         assert a[key] == {}, key
 
 
-def test_export_never_calls_datetime_now():
-    # Two calls with identical injected clocks must agree on every time field.
+def test_repeated_builds_with_the_same_injected_clock_agree():
+    # NOTE: this only proves build() is stable given an identical injected
+    # clock -- it would still pass if generated_at came from datetime.now(),
+    # since both calls here use the same GENERATED_AT constant either way.
+    # The real "export never calls datetime.now()" guarantee is enforced in
+    # tests/test_export_invariants.py (test_generated_at_is_the_only_time_field_and_comes_from_injection).
     first, second = build(), build()
     assert first["generated_at"] == second["generated_at"]
 
@@ -186,6 +190,21 @@ def test_catalog_map_holds_a_portable_summary_for_each_owned_mold():
         "stability": "",
         "flight": {"speed": 2, "glide": 3, "turn": 0, "fade": 2},
     }
+
+
+def test_catalog_summary_reports_manufacturer_flight_not_personal_flight():
+    # An owned disc with recorded personal numbers must still publish the
+    # mold's own manufacturer flight in `catalog[]` -- catalog_map is keyed
+    # by catalog_id, so this mold's summary would otherwise contradict the
+    # same mold's manufacturer.flight wherever else it's referenced, and
+    # would depend on which owned copy happened to populate the map first.
+    # The disc's *own* personal numbers still belong in its inventory record.
+    d = owned(personal_flight={"speed": 9, "glide": 9, "turn": 9, "fade": 9})
+    out = build([d])
+    assert out["catalog"]["gateway-wizard"]["flight"] == {
+        "speed": 2, "glide": 3, "turn": 0, "fade": 2}
+    assert out["inventory"][0]["computed"]["effective_flight"] == {
+        "speed": 9.0, "glide": 9.0, "turn": 9.0, "fade": 9.0}
 
 
 def test_catalog_map_deduplicates_repeated_molds():
@@ -474,9 +493,14 @@ def test_excluded_disc_never_appears_in_the_reports_it_was_excluded_from():
 
 
 def test_reason_codes_are_stable_machine_readable_slugs():
-    out = build([owned(), unknown_flight_disc(), owned(disc_id="id-lost", status="lost")])
+    from tests.conftest import prototype_disc
+
+    proto = prototype_disc()
+    proto.id = "id-proto"
+    out = build([owned(), unknown_flight_disc(), owned(disc_id="id-lost", status="lost"), proto])
     for entry in out["analysis"]["exclusions"]:
-        assert entry["reason"] in {"incomplete_flight_data", "inactive_status"}
+        assert entry["reason"] in {"incomplete_flight_data", "inactive_status",
+                                   "incomplete_manufacturer_data"}
 
 
 def test_exclusions_are_sorted_by_id_then_reason():
