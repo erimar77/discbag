@@ -198,3 +198,61 @@ def test_catalog_map_excludes_unreferenced_records():
                     "stability": "Overstable", "speed": 12, "glide": 5, "turn": -1, "fade": 3}
     out = build([owned()], catalog=[unreferenced])
     assert "innova-destroyer" not in out["catalog"]
+
+
+# ---------- coverage / gaps ----------
+
+def test_coverage_reports_every_role_with_priority_and_reason():
+    from discbag.roles import ROLES
+    out = build([owned()])
+    coverage = out["analysis"]["coverage"]
+    assert len(coverage) == len(ROLES)
+    putting = next(c for c in coverage if c["role"] == "Putting")
+    assert putting["covered"] is True
+    assert putting["priority"] == "Satisfied"
+    assert putting["reason"]
+    assert putting["disc_ids"] == ["id-wizard"]
+
+
+def test_gaps_lists_only_uncovered_roles():
+    out = build([owned()])
+    gaps = out["analysis"]["gaps"]
+    assert "Putting" not in [g["role"] for g in gaps]
+    assert all(g["covered"] is False for g in gaps)
+
+
+def test_coverage_disc_ids_reference_real_inventory_ids():
+    out = build([owned()])
+    known = {r["inventory_id"] for r in out["inventory"]}
+    for entry in out["analysis"]["coverage"]:
+        assert set(entry["disc_ids"]) <= known
+
+
+# ---------- next purchase ----------
+
+def test_next_purchase_is_null_for_an_empty_bag():
+    assert build()["analysis"]["next_purchase"] is None
+
+
+def test_next_purchase_carries_reason_and_catalog_backed_candidates():
+    catalog = [{"name": "Firebird", "brand": "Innova", "category": "Distance Driver",
+                "stability": "Very Overstable", "speed": 9, "glide": 3, "turn": 0, "fade": 4}]
+    out = build([owned()], catalog=catalog)
+    nxt = out["analysis"]["next_purchase"]
+    assert nxt["role"]
+    assert nxt["reason"]
+    for cand in nxt["candidates"]:
+        assert cand["catalog_id"] in out["catalog"]
+
+
+# ---------- maturity ----------
+
+def test_maturity_reports_phase_and_signals():
+    out = build([owned()])
+    m = out["analysis"]["maturity"]
+    assert m["phase"] in {"Discovery", "Developing", "Developed"}
+    assert all({"met", "text"} <= set(s) for s in m["signals"])
+
+
+def test_maturity_is_null_when_there_is_nothing_to_assess():
+    assert build()["analysis"]["maturity"] is None
