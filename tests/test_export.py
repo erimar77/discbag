@@ -1,6 +1,6 @@
 from datetime import date, datetime
 
-from discbag import export
+from discbag import export, recommend
 from discbag.inventory import OwnedDisc
 from discbag.player import PlayerProfile
 
@@ -304,3 +304,42 @@ def test_no_technical_or_open_scenario_exists():
     bags = build([owned()])["analysis"]["scenario_bags"]
     assert "technical" not in bags
     assert "open" not in bags
+
+
+def test_scenario_bags_goal_default_reads_from_analysis_defaults():
+    """Regression test: scenario_bags must use ANALYSIS_DEFAULTS["goal"], not hardcoded.
+
+    This test verifies that when scenario_bags calls _bag_result without a goal,
+    it reads from ANALYSIS_DEFAULTS["goal"] instead of using a hardcoded literal.
+    """
+    from unittest import mock
+
+    original_goal = export.ANALYSIS_DEFAULTS["goal"]
+    try:
+        # Set up a disc inventory
+        discs = [owned(disc_id="id-wizard")]
+
+        # Patch the recommend.build_bag to capture which goal was actually used
+        original_build_bag = recommend.build_bag
+        captured_goals = []
+
+        def capturing_build_bag(*args, **kwargs):
+            captured_goals.append(kwargs.get("goal"))
+            return original_build_bag(*args, **kwargs)
+
+        with mock.patch.object(recommend, "build_bag", side_effect=capturing_build_bag):
+            # Change ANALYSIS_DEFAULTS["goal"] and rebuild
+            export.ANALYSIS_DEFAULTS["goal"] = "development"
+            build(discs)
+
+        # Verify that scenario_bags called build_bag with goal="development"
+        # (from ANALYSIS_DEFAULTS), not "coverage" (hardcoded).
+        # scenario_bags makes 3 calls (for windy, woods, minimal), so check them all.
+        scenario_goals = captured_goals[-3:]  # Last 3 calls are scenario_bags
+        assert all(g == "development" for g in scenario_goals), (
+            f"Expected scenario_bags to use development goal, but got: {scenario_goals}. "
+            "The goal default may be hardcoded instead of reading from ANALYSIS_DEFAULTS."
+        )
+
+    finally:
+        export.ANALYSIS_DEFAULTS["goal"] = original_goal

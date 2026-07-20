@@ -13,6 +13,7 @@ what makes build_export() deterministic and byte-reproducible in tests.
 from dataclasses import asdict
 
 from discbag import __version__, db, maturity, player, recommend, roles
+from discbag.recommend import GOALS
 from discbag.inventory import Disc
 
 SCHEMA_VERSION = "1.0"
@@ -184,12 +185,11 @@ def _maturity(active, all_discs, profile, analysis_date):
     }
 
 
-GOALS = ["coverage", "development", "confidence", "tournament", "fun"]
-
-
-def _bag_result(active, profile, analysis_date, goal="coverage", situation=None):
+def _bag_result(active, profile, analysis_date, goal=None, situation=None):
     """One build-bag report. Uses the CLI defaults: no size limit, no rotation
     (rotation is RNG-driven and would break reproducibility)."""
+    if goal is None:
+        goal = ANALYSIS_DEFAULTS["goal"]
     result = recommend.build_bag(
         active, size=ANALYSIS_DEFAULTS["bag_size"], situation=situation,
         goal=goal, rotate=False, profile=profile, today=analysis_date)
