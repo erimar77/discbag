@@ -142,3 +142,36 @@ def test_catalog_id_omits_empty_parts_without_leaving_a_stray_hyphen():
 def test_catalog_id_is_deterministic():
     rec = {"brand": "Gateway", "name": "Wizard"}
     assert db.catalog_id(rec) == db.catalog_id(rec)
+
+
+def test_catalog_id_uniqueness_in_bundled_catalog():
+    """Verify every record in the bundled catalog produces a unique catalog_id.
+
+    Collision would silently merge discs into one JSON entry, so this must not regress.
+    """
+    catalog = json.loads(db.BUNDLED_DB_PATH.read_text())
+    discs = catalog["discs"]
+
+    # Map catalog_id to list of records that produce it
+    id_to_records = {}
+    for rec in discs:
+        cid = db.catalog_id(rec)
+        if cid not in id_to_records:
+            id_to_records[cid] = []
+        id_to_records[cid].append(rec)
+
+    # Find duplicates
+    duplicates = {cid: recs for cid, recs in id_to_records.items() if len(recs) > 1}
+
+    # Build a helpful error message listing collisions
+    if duplicates:
+        msg_parts = ["catalog_id collisions detected:"]
+        for cid in sorted(duplicates.keys()):
+            recs = duplicates[cid]
+            msg_parts.append(f"  {cid}: {len(recs)} records")
+            for rec in recs:
+                msg_parts.append(f"    - {rec.get('brand')} {rec.get('name')}")
+        assert False, "\n".join(msg_parts)
+
+    # All ids are unique
+    assert len(id_to_records) == len(discs)
