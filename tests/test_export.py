@@ -235,12 +235,17 @@ def test_next_purchase_is_null_for_an_empty_bag():
 
 
 def test_next_purchase_carries_reason_and_catalog_backed_candidates():
-    catalog = [{"name": "Firebird", "brand": "Innova", "category": "Distance Driver",
-                "stability": "Very Overstable", "speed": 9, "glide": 3, "turn": 0, "fade": 4}]
+    # A neutral midrange qualifies for the "Straight mid" role, the gap a
+    # lone-putter bag is missing next — unlike a distance driver, which would
+    # never qualify and would leave candidates empty for reasons unrelated to
+    # what this test checks.
+    catalog = [{"name": "Roc3", "brand": "Innova", "category": "Midrange",
+                "stability": "Understable", "speed": 5, "glide": 4, "turn": 0, "fade": 1}]
     out = build([owned()], catalog=catalog)
     nxt = out["analysis"]["next_purchase"]
     assert nxt["role"]
     assert nxt["reason"]
+    assert nxt["candidates"]
     for cand in nxt["candidates"]:
         assert cand["catalog_id"] in out["catalog"]
 
@@ -256,3 +261,12 @@ def test_maturity_reports_phase_and_signals():
 
 def test_maturity_is_null_when_there_is_nothing_to_assess():
     assert build()["analysis"]["maturity"] is None
+
+
+def test_maturity_is_computed_for_an_archived_only_bag():
+    # No active discs, but the inventory is non-empty: assess_phase has a
+    # designed "Discovery" branch for this case and it must not be discarded.
+    out = build([owned(disc_id="id-lost", status="lost")])
+    m = out["analysis"]["maturity"]
+    assert m is not None
+    assert m["phase"] == "Discovery"

@@ -13,6 +13,7 @@ what makes build_export() deterministic and byte-reproducible in tests.
 from dataclasses import asdict
 
 from discbag import __version__, db, maturity, player, recommend, roles
+from discbag.inventory import Disc
 
 SCHEMA_VERSION = "1.0"
 
@@ -199,16 +200,14 @@ def build_export(inventory, profile, catalog, *, analysis_date, generated_at):
         catalog_map.setdefault(db.catalog_id(disc), _catalog_summary(disc))
 
     active = [d for d in inventory if d.user.is_active]
+    catalog_discs = [Disc.from_db_record(r) for r in catalog]
     analysis_section = _empty_analysis()
     if active:
         assessment = roles.assess(active, profile)
         analysis_section["coverage"] = [_coverage_entry(rc) for rc in assessment]
         analysis_section["gaps"] = [_coverage_entry(rc) for rc in assessment if not rc.covered]
-        analysis_section["next_purchase"] = _next_purchase(active, catalog, profile, catalog_map)
-        analysis_section["maturity"] = _maturity(active, inventory, profile, analysis_date)
-    else:
-        analysis_section["next_purchase"] = None
-        analysis_section["maturity"] = None
+        analysis_section["next_purchase"] = _next_purchase(active, catalog_discs, profile, catalog_map)
+    analysis_section["maturity"] = _maturity(active, inventory, profile, analysis_date)
 
     return {
         "schema_version": SCHEMA_VERSION,
