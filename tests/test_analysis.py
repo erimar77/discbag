@@ -250,6 +250,87 @@ def test_degraded_note_pair_selection_is_order_independent_on_ties():
     assert fwd_distinct == rev_distinct == "Alpha"
 
 
+def test_degraded_note_pair_naming_follows_input_order_not_identity():
+    # An unambiguous (non-tied) closest pair: Zeta-Xray at flight-distance 1 is
+    # strictly closer than any pair involving Omega, so there is no tiebreak
+    # in play here at all -- this isolates naming order from pair selection.
+    # Zeta and Xray are deliberately named so that alphabetical order (what
+    # disc_identity_key would produce) is the REVERSE of their list order,
+    # so sorting the printed names by identity is distinguishable from
+    # printing them in input/index order.
+    zeta = Disc(name="Zeta", brand="X", category="Putter",
+                speed=5, glide=5, turn=0, fade=0)
+    xray = Disc(name="Xray", brand="X", category="Putter",
+                speed=5, glide=5, turn=0, fade=1)
+    omega = Disc(name="Omega", brand="X", category="Distance Driver",
+                 speed=12, glide=5, turn=-1, fade=3)
+
+    d_zx = analysis._flight_distance(zeta, xray)
+    d_zo = analysis._flight_distance(zeta, omega)
+    d_xo = analysis._flight_distance(xray, omega)
+    assert d_zx < d_zo and d_zx < d_xo   # Zeta-Xray is unambiguously closest
+
+    import re
+    pattern = re.compile(r"Most similar: (\w+) and (\w+)\.")
+
+    forward = analysis.compare_verdict([zeta, xray, omega]).degraded_note
+    swapped = analysis.compare_verdict([xray, zeta, omega]).degraded_note
+
+    fwd_a, fwd_b = pattern.match(forward).groups()
+    swp_a, swp_b = pattern.match(swapped).groups()
+
+    # Names print in the order the discs were passed in, not sorted by the
+    # opaque identity key (which would print "Xray and Zeta" every time,
+    # since "Xray" < "Zeta" alphabetically).
+    assert (fwd_a, fwd_b) == ("Zeta", "Xray")
+    assert (swp_a, swp_b) == ("Xray", "Zeta")
+
+
+def test_degraded_note_pair_selection_tiebreak_is_permutation_invariant():
+    # Two disjoint pairs tied at the exact same flight-distance, so the pair-
+    # selection tiebreak (identity key, canonicalized via tuple(sorted(...)))
+    # decides which pair is reported. Differ only on fade so the distance is
+    # exactly the fade gap (weight 1.0) -- no floating-point rounding to
+    # worry about.
+    aaron = Disc(name="Aaron", brand="X", category="Putter",
+                 speed=5, glide=5, turn=0, fade=0)
+    xander = Disc(name="Xander", brand="X", category="Putter",
+                  speed=5, glide=5, turn=0, fade=1)
+    mia = Disc(name="Mia", brand="X", category="Putter",
+               speed=5, glide=5, turn=0, fade=10)
+    nora = Disc(name="Nora", brand="X", category="Putter",
+                speed=5, glide=5, turn=0, fade=11)
+
+    d_ax = analysis._flight_distance(aaron, xander)
+    d_mn = analysis._flight_distance(mia, nora)
+    assert d_ax == d_mn == 1.0   # the fixture genuinely ties
+
+    # And confirm every other cross-pair distance is strictly larger, so this
+    # really is the (tied) global minimum and not accidentally a 4-way tie.
+    others = [analysis._flight_distance(a, b)
+              for a in (aaron, xander) for b in (mia, nora)]
+    assert all(d > d_ax for d in others)
+
+    import re
+    pattern = re.compile(r"Most similar: (\w+) and (\w+)\.")
+
+    def selected_pair(bag):
+        note = analysis.compare_verdict(bag).degraded_note
+        a, b = pattern.match(note).groups()
+        return frozenset({a, b})
+
+    # Two permutations that differ only in which of Aaron/Xander is listed
+    # first. The canonicalized identity tiebreak must select the same pair
+    # (Aaron & Xander, since "Aaron" < "Mia") regardless of that ordering.
+    bag_xander_first = [xander, aaron, mia, nora]
+    bag_aaron_first = [aaron, xander, mia, nora]
+
+    pair_1 = selected_pair(bag_xander_first)
+    pair_2 = selected_pair(bag_aaron_first)
+
+    assert pair_1 == pair_2 == frozenset({"Aaron", "Xander"})
+
+
 # ---------- Unknown-flight discs ----------
 
 def test_choose_excludes_unknown_flight():

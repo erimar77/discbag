@@ -430,11 +430,13 @@ recommended, has a portable summary in `catalog`, keyed by a stable `catalog_id`
 An export renders on a machine with no `discbag` installation. `discbag` produces the data;
 external tools visualize it.
 
-Two conventions worth knowing when consuming an export:
+Three conventions worth knowing when consuming an export:
 
 - `fit_score` is a **distance from a role's ideal — lower is better**, not a 0-1 rating.
 - `scenario_bags` holds only the three distinct scenarios (`windy`, `woods`, `minimal`);
   `scenario_aliases` maps `rain` and `travel` onto them. Resolve through the alias map.
+- `catalog[].flight` is always the mold's manufacturer numbers; a user's own recorded
+  numbers live only in `inventory[].computed.effective_flight`.
 
 Discs the engine can't fully evaluate stay visible in `inventory` but sit out the analyses they're
 excluded from — archived discs, discs with incomplete flight data, and discs with recorded personal
