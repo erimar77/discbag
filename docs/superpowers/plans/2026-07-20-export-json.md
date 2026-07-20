@@ -795,9 +795,10 @@ Append to `tests/test_export.py`:
 # ---------- coverage / gaps ----------
 
 def test_coverage_reports_every_role_with_priority_and_reason():
+    from discbag.roles import ROLES
     out = build([owned()])
     coverage = out["analysis"]["coverage"]
-    assert len(coverage) == len(__import__("discbag.roles", fromlist=["ROLES"]).ROLES)
+    assert len(coverage) == len(ROLES)
     putting = next(c for c in coverage if c["role"] == "Putting")
     assert putting["covered"] is True
     assert putting["priority"] == "Satisfied"
@@ -1402,53 +1403,69 @@ git commit -m "export: structured exclusions with stable reason codes"
 
 - [ ] **Step 1: Write the failing tests**
 
-Append to `tests/test_cli.py` (match the file's existing invocation helper — if it differs from `run_cli`, use that instead):
+Append to `tests/test_cli.py`. This file has no `run_cli` helper — commands are invoked as `cli.cmd_x(_ns(...), inv)` against an `inventory.Inventory` rooted at `tmp_path`, and the parser is exercised separately via `cli.build_parser()`. Follow both conventions:
 
 ```python
 # ---------- export ----------
 
-def test_export_writes_valid_json_to_stdout(tmp_path, capsys):
-    out = run_cli(["export"])
+def test_cmd_export_writes_valid_json_to_stdout(tmp_path, capsys):
+    inv = _inv_with_mako(tmp_path)
+    assert cli.cmd_export(_ns(output=None, indent=2), inv) == 0
     payload = json.loads(capsys.readouterr().out)
     assert payload["schema_version"] == "1.0"
     assert set(payload) >= {"profile", "inventory", "analysis", "catalog"}
-    assert out == 0
+    assert len(payload["inventory"]) == 1
 
 
-def test_export_writes_to_a_file_with_output(tmp_path, capsys):
+def test_cmd_export_writes_to_a_file_with_output(tmp_path, capsys):
+    inv = _inv_with_mako(tmp_path)
     target = tmp_path / "snapshot.json"
-    assert run_cli(["export", "--output", str(target)]) == 0
-    payload = json.loads(target.read_text())
-    assert payload["schema_version"] == "1.0"
+    assert cli.cmd_export(_ns(output=str(target), indent=2), inv) == 0
+    assert json.loads(target.read_text())["schema_version"] == "1.0"
     assert capsys.readouterr().out.strip() == ""       # file mode prints no JSON
+
+
+def test_cmd_export_generated_at_is_utc_zulu(tmp_path, capsys):
+    from datetime import datetime
+    cli.cmd_export(_ns(output=None, indent=2), _inv_with_mako(tmp_path))
+    stamp = json.loads(capsys.readouterr().out)["generated_at"]
+    assert stamp.endswith("Z")
+    datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%SZ")     # raises on any other format
+
+
+def test_export_is_registered_with_output_and_indent_options():
+    args = cli.build_parser().parse_args(["export", "--output", "x.json", "--indent", "4"])
+    assert args.func is cli.cmd_export
+    assert args.output == "x.json"
+    assert args.indent == 4
+
+
+def test_export_defaults_to_stdout_and_indent_two():
+    args = cli.build_parser().parse_args(["export"])
+    assert args.output is None
+    assert args.indent == 2
 
 
 def test_export_has_no_json_flag():
     # The command emits JSON by definition; a mandatory flag would carry no information.
-    assert run_cli(["export", "--json"]) != 0
+    with pytest.raises(SystemExit):
+        cli.build_parser().parse_args(["export", "--json"])
 
 
 def test_export_help_warns_that_snapshots_contain_personal_data(capsys):
     with pytest.raises(SystemExit):
-        run_cli(["export", "--help"])
+        cli.build_parser().parse_args(["export", "--help"])
     help_text = capsys.readouterr().out.lower()
     assert "personal" in help_text
     assert "history" in help_text
-
-
-def test_export_generated_at_is_utc_zulu(capsys):
-    run_cli(["export"])
-    payload = json.loads(capsys.readouterr().out)
-    assert payload["generated_at"].endswith("Z")
-    datetime.strptime(payload["generated_at"], "%Y-%m-%dT%H:%M:%SZ")
 ```
 
-Ensure `tests/test_cli.py` imports `json`, `pytest`, and `from datetime import datetime`.
+Add `import json` to the top of `tests/test_cli.py` if it is not already imported (`pytest` already is).
 
 - [ ] **Step 2: Run tests to verify they fail**
 
 Run: `python -m pytest tests/test_cli.py -k export -v`
-Expected: FAIL — `invalid choice: 'export'`
+Expected: FAIL — `AttributeError: module 'discbag.cli' has no attribute 'cmd_export'` and `invalid choice: 'export'`
 
 - [ ] **Step 3: Implement the command**
 
