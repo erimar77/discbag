@@ -349,6 +349,22 @@ def roles_for_situation(situation):
     return [order[name] for name in names if name in order]
 
 
+def canonical_situations():
+    """(canonical_names, aliases). Several situations share an identical role
+    set — windy/rain and minimal/travel — so reports need only be built for the
+    distinct ones. The first name in table order wins as canonical.
+    """
+    canonical, aliases, seen = [], {}, {}
+    for name, role_names in _SITUATIONS.items():
+        key = tuple(role_names)
+        if key in seen:
+            aliases[name] = seen[key]
+        else:
+            seen[key] = name
+            canonical.append(name)
+    return canonical, aliases
+
+
 def english_list(items):
     items = list(items)
     if len(items) <= 1:

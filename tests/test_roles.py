@@ -252,3 +252,23 @@ def test_assess_ignores_unknown_flight_discs():
     # the Unknown disc fills no role
     for rc in cov:
         assert unknown not in rc.discs
+
+
+# ---------- canonical situations ----------
+
+def test_canonical_situations_dedupes_identical_role_sets():
+    canonical, aliases = roles.canonical_situations()
+    assert canonical == ["windy", "woods", "minimal"]
+    assert aliases == {"rain": "windy", "travel": "minimal"}
+
+
+def test_every_situation_is_canonical_or_aliased_to_one():
+    canonical, aliases = roles.canonical_situations()
+    for name in roles._SITUATIONS:
+        assert name in canonical or aliases[name] in canonical
+
+
+def test_aliased_situations_resolve_to_the_same_roles():
+    canonical, aliases = roles.canonical_situations()
+    for alias, target in aliases.items():
+        assert roles.roles_for_situation(alias) == roles.roles_for_situation(target)

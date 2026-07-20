@@ -184,6 +184,25 @@ def _maturity(active, all_discs, profile, analysis_date):
     }
 
 
+GOALS = ["coverage", "development", "confidence", "tournament", "fun"]
+
+
+def _bag_result(active, profile, analysis_date, goal="coverage", situation=None):
+    """One build-bag report. Uses the CLI defaults: no size limit, no rotation
+    (rotation is RNG-driven and would break reproducibility)."""
+    result = recommend.build_bag(
+        active, size=ANALYSIS_DEFAULTS["bag_size"], situation=situation,
+        goal=goal, rotate=False, profile=profile, today=analysis_date)
+    return {
+        # Engine order throughout — role priority, never alphabetized.
+        # RoleFill.score is roles.fit_score for the chosen role: LOWER IS BETTER.
+        "filled": [{"role": f.role.name, "disc_id": f.disc.id, "fit_score": f.score}
+                   for f in result.filled],
+        "gaps": [r.name for r in result.gaps],
+        "omitted": [r.name for r in result.omitted],
+    }
+
+
 def build_export(inventory, profile, catalog, *, analysis_date, generated_at):
     """A complete, deterministic snapshot of the collection and its analysis.
 
@@ -207,6 +226,14 @@ def build_export(inventory, profile, catalog, *, analysis_date, generated_at):
         analysis_section["coverage"] = [_coverage_entry(rc) for rc in assessment]
         analysis_section["gaps"] = [_coverage_entry(rc) for rc in assessment if not rc.covered]
         analysis_section["next_purchase"] = _next_purchase(active, catalog_discs, profile, catalog_map)
+        analysis_section["goal_bags"] = {
+            goal: _bag_result(active, profile, analysis_date, goal=goal)
+            for goal in GOALS}
+        canonical, aliases = roles.canonical_situations()
+        analysis_section["scenario_bags"] = {
+            name: _bag_result(active, profile, analysis_date, situation=name)
+            for name in canonical}
+        analysis_section["scenario_aliases"] = dict(aliases)
     analysis_section["maturity"] = _maturity(active, inventory, profile, analysis_date)
 
     return {

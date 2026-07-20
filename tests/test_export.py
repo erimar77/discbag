@@ -270,3 +270,37 @@ def test_maturity_is_computed_for_an_archived_only_bag():
     m = out["analysis"]["maturity"]
     assert m is not None
     assert m["phase"] == "Discovery"
+
+
+# ---------- goal and scenario bags ----------
+
+def test_goal_bags_cover_every_supported_goal():
+    out = build([owned()])
+    assert set(out["analysis"]["goal_bags"]) == {
+        "coverage", "development", "confidence", "tournament", "fun"}
+
+
+def test_goal_bag_entries_reference_inventory_ids_in_engine_order():
+    out = build([owned()])
+    bag = out["analysis"]["goal_bags"]["coverage"]
+    known = {r["inventory_id"] for r in out["inventory"]}
+    for slot in bag["filled"]:
+        assert slot["disc_id"] in known
+        assert slot["role"]
+    assert isinstance(bag["gaps"], list)
+
+
+def test_scenario_bags_hold_only_the_three_canonical_scenarios():
+    out = build([owned()])
+    assert set(out["analysis"]["scenario_bags"]) == {"windy", "woods", "minimal"}
+
+
+def test_scenario_aliases_map_duplicates_to_canonical_names():
+    out = build([owned()])
+    assert out["analysis"]["scenario_aliases"] == {"rain": "windy", "travel": "minimal"}
+
+
+def test_no_technical_or_open_scenario_exists():
+    bags = build([owned()])["analysis"]["scenario_bags"]
+    assert "technical" not in bags
+    assert "open" not in bags
