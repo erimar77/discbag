@@ -175,12 +175,23 @@ def _how_to_use_text(a, b):
 
 def _degraded_note(discs):
     idx = range(len(discs))
+    key = lambda i: roles.disc_identity_key(discs[i])
     pairs = [(i, j) for i in idx for j in idx if i < j]
-    ci, cj = min(pairs, key=lambda p: _flight_distance(discs[p[0]], discs[p[1]]))
+    # Identity tiebreak on the pair: two disc-pairs can land on the exact same
+    # flight distance, and without a deterministic tiebreak the choice would
+    # depend on which pair the (bag-order-derived) enumeration reached first.
+    # Sorting the pair's own two keys canonicalizes it regardless of which
+    # index is i vs j.
+    ci, cj = min(pairs, key=lambda p: (_flight_distance(discs[p[0]], discs[p[1]]),
+                                       tuple(sorted((key(p[0]), key(p[1]))))))
     dist_total = lambda i: sum(_flight_distance(discs[i], discs[j])
                                for j in idx if j != i)
-    di = max(idx, key=dist_total)
-    return (f"Most similar: {discs[ci].name} and {discs[cj].name}. "
+    # Identity tiebreak: deterministic even when two discs have the exact same
+    # total distance to the others. min()+negated distance so a tie resolves
+    # to the alphabetically-first disc, consistent with every sorted() site.
+    di = min(idx, key=lambda i: (-dist_total(i), key(i)))
+    a, b = (discs[ci], discs[cj]) if key(ci) <= key(cj) else (discs[cj], discs[ci])
+    return (f"Most similar: {a.name} and {b.name}. "
             f"Most distinct: {discs[di].name}.")
 
 

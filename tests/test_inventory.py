@@ -58,6 +58,26 @@ def test_owned_roundtrips_through_dict_keeping_sections_separate():
     assert back.speed == 5
 
 
+def test_from_dict_coerces_a_numeric_id_to_string():
+    # A hand-edited inventory.json can carry a bare JSON number for "id".
+    disc = OwnedDisc.from_dict({"brand": "Innova", "mold": "Mako3",
+                                "cached": {"name": "Mako3"}, "user": {}, "id": 42})
+    assert disc.id == "42"
+    assert isinstance(disc.id, str)
+
+
+def test_bag_with_mixed_numeric_and_string_ids_sorts_without_raising():
+    from discbag import roles
+    numeric_id = OwnedDisc.from_dict({"brand": "Innova", "mold": "Mako3",
+                                      "cached": dict(MAKO3), "user": {}, "id": 42})
+    string_id = OwnedDisc.from_dict({"brand": "Innova", "mold": "Roc",
+                                     "cached": dict(MAKO3, name="Roc"),
+                                     "user": {}, "id": "id-b"})
+    # Must not raise TypeError comparing an int id against a string id.
+    ordered = sorted([numeric_id, string_id], key=roles.disc_identity_key)
+    assert {d.id for d in ordered} == {"42", "id-b"}
+
+
 def test_refresh_from_db_updates_cached_not_user():
     disc = OwnedDisc.from_db_record(MAKO3, plastic="Star")
     disc.user.notes = "my favorite"

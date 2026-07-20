@@ -214,6 +214,28 @@ def test_verdict_none_for_fewer_than_two_discs():
     assert analysis.compare_verdict([]) is None
 
 
+def test_degraded_note_is_order_independent_on_ties():
+    # Four discs on a line (by speed only -- glide/turn/fade held equal) built
+    # so the two endpoints tie for "most distinct" (max total flight-distance
+    # to the other three), and the two closest neighbor-pairs also tie for
+    # "most similar". Before the fix, both `min(pairs, ...)` and
+    # `max(idx, key=dist_total)` broke ties by list position (bag order), not
+    # disc identity, so reversing the bag could change the reported note.
+    alpha = Disc(name="Alpha", brand="X", category="Putter",
+                speed=1, glide=3, turn=0, fade=0)
+    bravo = Disc(name="Bravo", brand="X", category="Putter",
+                speed=2, glide=3, turn=0, fade=0)
+    charlie = Disc(name="Charlie", brand="X", category="Distance Driver",
+                   speed=8, glide=3, turn=0, fade=0)
+    delta = Disc(name="Delta", brand="X", category="Distance Driver",
+                speed=9, glide=3, turn=0, fade=0)
+    bag = [alpha, bravo, charlie, delta]
+
+    forward = analysis.compare_verdict(bag).degraded_note
+    reverse = analysis.compare_verdict(list(reversed(bag))).degraded_note
+    assert forward == reverse
+
+
 # ---------- Unknown-flight discs ----------
 
 def test_choose_excludes_unknown_flight():

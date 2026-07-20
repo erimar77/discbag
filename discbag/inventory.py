@@ -315,7 +315,10 @@ class OwnedDisc:
             mold=data.get("mold", ""),
             cached=Disc.from_dict(data.get("cached", {})),
             user=UserData.from_dict(data.get("user", {})),
-            id=data.get("id", ""),
+            # Coerced to str: a hand-edited inventory.json can carry a numeric id,
+            # and roles.disc_identity_key() relies on every disc's id being a
+            # plain string so it's always comparable in a mixed sort.
+            id=str(data.get("id", "")),
         )
 
     def to_dict(self):

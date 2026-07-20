@@ -184,6 +184,23 @@ def test_usage_insight_category_leader():
     assert any("Teebird" in s and "fairway" in s.lower() and "rounds" in s.lower() for s in out)
 
 
+def test_usage_insights_are_order_independent_across_categories():
+    # Two categories, each with a dominant disc and no overlapping backup, so
+    # _primary_backup_insight qualifies in both. Before the fix it iterated
+    # _by_category(active) in bag insertion order and returned on the first
+    # qualifying category -- so reversing the bag (which reverses which
+    # category is inserted into the dict first) changed which insight won.
+    zone = owned("Zone", speed=2, turn=0, fade=3, uses=20, last="2026-07-10", added="2020-01-01")
+    aviar = owned("Aviar", speed=2, turn=0, fade=0, uses=0, added="2026-07-01")
+    buzzz = owned("Buzzz", speed=5, turn=-1, fade=1, uses=20, last="2026-07-10", added="2020-01-01")
+    roc = owned("Roc", speed=5, turn=0, fade=3, uses=0, added="2026-07-01")
+    bag = [zone, aviar, buzzz, roc]
+
+    forward = maturity.usage_insights(bag, TODAY)
+    reverse = maturity.usage_insights(list(reversed(bag)), TODAY)
+    assert forward == reverse
+
+
 def test_usage_insights_capped():
     # Build many candidate insights; result must not exceed MAX_INSIGHTS.
     bag = []

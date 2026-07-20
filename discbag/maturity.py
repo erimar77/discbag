@@ -213,13 +213,17 @@ def _neglected_insight(active, today):
 
 def _primary_backup_insight(active):
     from discbag import analysis
-    for cat, discs in _by_category(active).items():
+    # Sorted by category name: this returns on the first qualifying category,
+    # so plain dict order (bag insertion order) would let reversing the bag
+    # change which insight is reported. See disc_identity_key()'s docstring.
+    for cat, discs in sorted(_by_category(active).items()):
         total = sum(_uses(d) for d in discs)
         if total == 0 or len(discs) < 2:
             continue
         # Identity tiebreak: deterministic even when two discs in the category
-        # have the exact same use count.
-        top = max(discs, key=lambda d: (_uses(d), roles.disc_identity_key(d)))
+        # have the exact same use count. min()+negated count so a tie resolves
+        # to the alphabetically-first disc, consistent with every sorted() site.
+        top = min(discs, key=lambda d: (-_uses(d), roles.disc_identity_key(d)))
         if _uses(top) / total < DOMINANT_SHARE:
             continue
         # A backup exists if any other disc overlaps the primary's flight.
@@ -234,12 +238,17 @@ def _primary_backup_insight(active):
 
 def _category_leader_insight(active):
     best = None
-    for cat, discs in _by_category(active).items():
+    # Sorted by category name so the cross-category "best so far" comparison
+    # below runs in a fixed order regardless of bag order -- otherwise a tie
+    # in round_count between two categories' leaders would resolve to whichever
+    # category the bag happened to list first. See disc_identity_key()'s docstring.
+    for cat, discs in sorted(_by_category(active).items()):
         if len(discs) < 2:
             continue
         # Identity tiebreak: deterministic even when two discs in the category
-        # have the exact same round count.
-        top = max(discs, key=lambda d: (d.user.round_count, roles.disc_identity_key(d)))
+        # have the exact same round count. min()+negated count so a tie resolves
+        # to the alphabetically-first disc, consistent with every sorted() site.
+        top = min(discs, key=lambda d: (-d.user.round_count, roles.disc_identity_key(d)))
         if top.user.round_count <= 0:
             continue
         if best is None or top.user.round_count > best[0]:
@@ -254,7 +263,11 @@ def usage_insights(active, today):
     candidates = []
     candidates.append(_neglected_insight(active, today))
     candidates.append(_primary_backup_insight(active))
-    for cat, discs in sorted(groups.items(), key=lambda kv: -len(kv[1])):
+    # Category name as a secondary key: two categories can tie on size, and
+    # `sorted` is stable, so without it a tie would fall back to dict order
+    # (bag insertion order) and could change which concentration insight is
+    # placed first -- and, once MAX_INSIGHTS trims the list, which appear at all.
+    for cat, discs in sorted(groups.items(), key=lambda kv: (-len(kv[1]), kv[0])):
         candidates.append(_concentration_insight(cat, discs))
     candidates.append(_category_leader_insight(active))
     out = [c for c in candidates if c]
@@ -271,7 +284,15 @@ def _stability_group(disc):
 
 
 def _dominant(labels, share):
-    """The single label holding >= share of the list, or None."""
+    """The single label holding >= share of the list, or None.
+
+    `counts` is built in first-seen (bag) order, and a tied `max()` would
+    normally make that order observable. It can't here: two labels tied for
+    the max can each hold at most half of `labels`, so a genuine tie can
+    never reach `share` (>= PREF_SHARE, which is > 0.5) -- the tie is only
+    ever between labels that both fail the threshold, and the result is
+    None either way. No ordering fix needed.
+    """
     if not labels:
         return None
     counts = {}
@@ -313,7 +334,10 @@ def observed_preferences(active):
     # Brand concentration: a single dominant brand, or a clearly-dominant pair.
     brands = [str(d.brand) for d in active if str(d.brand)]
     if brands:
-        ranked = Counter(brands).most_common()
+        # Counter.most_common() breaks count ties by first-seen (bag) order;
+        # sort explicitly so a tie instead resolves to the alphabetically-first
+        # brand, consistent with every other tiebreak in this module.
+        ranked = sorted(Counter(brands).items(), key=lambda kv: (-kv[1], kv[0]))
         n = len(brands)
         if ranked[0][1] / n >= PREF_SHARE:
             out.append(f"Most of your bag is {ranked[0][0]}.")
