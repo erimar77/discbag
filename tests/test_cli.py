@@ -1,4 +1,5 @@
 import argparse
+import json
 import pytest
 
 from discbag import cli
@@ -1099,3 +1100,57 @@ def test_show_manufacturer_complete_disc_still_shows_power_line(tmp_path, capsys
     assert rc == 0
     out = capsys.readouterr().out
     assert "Power:" in out                            # regression: unaffected by the fix
+
+
+# ---------- export ----------
+
+def test_cmd_export_writes_valid_json_to_stdout(tmp_path, capsys):
+    inv = _inv_with_mako(tmp_path)
+    assert cli.cmd_export(_ns(output=None, indent=2), inv) == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["schema_version"] == "1.0"
+    assert set(payload) >= {"profile", "inventory", "analysis", "catalog"}
+    assert len(payload["inventory"]) == 1
+
+
+def test_cmd_export_writes_to_a_file_with_output(tmp_path, capsys):
+    inv = _inv_with_mako(tmp_path)
+    target = tmp_path / "snapshot.json"
+    assert cli.cmd_export(_ns(output=str(target), indent=2), inv) == 0
+    assert json.loads(target.read_text())["schema_version"] == "1.0"
+    assert capsys.readouterr().out.strip() == ""       # file mode prints no JSON
+
+
+def test_cmd_export_generated_at_is_utc_zulu(tmp_path, capsys):
+    from datetime import datetime
+    cli.cmd_export(_ns(output=None, indent=2), _inv_with_mako(tmp_path))
+    stamp = json.loads(capsys.readouterr().out)["generated_at"]
+    assert stamp.endswith("Z")
+    datetime.strptime(stamp, "%Y-%m-%dT%H:%M:%SZ")     # raises on any other format
+
+
+def test_export_is_registered_with_output_and_indent_options():
+    args = cli.build_parser().parse_args(["export", "--output", "x.json", "--indent", "4"])
+    assert args.func is cli.cmd_export
+    assert args.output == "x.json"
+    assert args.indent == 4
+
+
+def test_export_defaults_to_stdout_and_indent_two():
+    args = cli.build_parser().parse_args(["export"])
+    assert args.output is None
+    assert args.indent == 2
+
+
+def test_export_has_no_json_flag():
+    # The command emits JSON by definition; a mandatory flag would carry no information.
+    with pytest.raises(SystemExit):
+        cli.build_parser().parse_args(["export", "--json"])
+
+
+def test_export_help_warns_that_snapshots_contain_personal_data(capsys):
+    with pytest.raises(SystemExit):
+        cli.build_parser().parse_args(["export", "--help"])
+    help_text = capsys.readouterr().out.lower()
+    assert "personal" in help_text
+    assert "history" in help_text

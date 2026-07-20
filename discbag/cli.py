@@ -1,9 +1,11 @@
 """Command-line interface for discbag."""
 
 import argparse
+import json
 import re
 import sys
 from datetime import date, datetime, timezone
+from pathlib import Path
 
 from discbag import db, history, player, roles
 from discbag.inventory import Disc, Inventory, OwnedDisc, UserData
@@ -1662,6 +1664,27 @@ def cmd_flight(args, inv):
     return 0
 
 
+def cmd_export(args, inv):
+    """Write a portable JSON snapshot of the collection and its analysis."""
+    from datetime import date, datetime, timezone
+
+    from discbag import export
+
+    payload = export.build_export(
+        inv.all_discs(),
+        player.load_profile(),
+        db.load_db().get("discs", []),
+        analysis_date=date.today(),
+        generated_at=datetime.now(timezone.utc),
+    )
+    text = json.dumps(payload, indent=args.indent, sort_keys=True)
+    if args.output:
+        Path(args.output).write_text(text + "\n")
+    else:
+        print(text)
+    return 0
+
+
 # ---------- argument parsing ----------
 
 _HELP_GROUPS = [
@@ -2020,6 +2043,21 @@ def build_parser():
 
     sub.add_parser("maturity",
                    help="where your collection sits today, and why").set_defaults(func=cmd_maturity)
+
+    p_export = sub.add_parser(
+        "export",
+        help="write a portable JSON snapshot of your collection and analysis",
+        description=("Write a portable JSON snapshot of your collection and every "
+                     "analysis discbag computes, for use by external tools.\n\n"
+                     "An export may contain personal profile details, disc notes, "
+                     "and your complete usage history. Anyone you send the file to "
+                     "can read all of it."),
+        formatter_class=argparse.RawDescriptionHelpFormatter)
+    p_export.add_argument("--output", metavar="PATH",
+                          help="write to this file instead of stdout")
+    p_export.add_argument("--indent", type=int, default=2,
+                          help="JSON indentation (default: 2)")
+    p_export.set_defaults(func=cmd_export)
 
     return parser
 
