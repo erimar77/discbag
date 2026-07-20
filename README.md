@@ -414,6 +414,37 @@ discbag db-info                     # database size and age
 `score` breaks a total into components (role fit and the goal's sub-terms) that sum to the points
 shown, and only lists components the engine actually used.
 
+### Export
+
+```bash
+discbag export [--output PATH] [--indent N]
+```
+
+Writes a portable JSON snapshot (schema v1.0) of your collection and every analysis `discbag`
+computes: role coverage, gaps, overlap groups, pairwise comparisons, goal and scenario bags,
+collection maturity, and next-purchase reasoning — each with the engine's own reasoning attached.
+`--output` writes to a file instead of stdout; `--indent` controls JSON indentation (default 2).
+
+The snapshot is self-contained: every mold referenced anywhere in the export, owned or merely
+recommended, has a portable summary in `catalog`, keyed by a stable `catalog_id` (brand + name).
+An export renders on a machine with no `discbag` installation. `discbag` produces the data;
+external tools visualize it.
+
+Two conventions worth knowing when consuming an export:
+
+- `fit_score` is a **distance from a role's ideal — lower is better**, not a 0-1 rating.
+- `scenario_bags` holds only the three distinct scenarios (`windy`, `woods`, `minimal`);
+  `scenario_aliases` maps `rain` and `travel` onto them. Resolve through the alias map.
+
+Discs the engine can't fully evaluate stay visible in `inventory` but sit out the analyses they're
+excluded from — archived discs, discs with incomplete flight data, and discs with recorded personal
+flight numbers but no published manufacturer numbers (which the pairwise-comparison engine declines
+to judge). `analysis.exclusions` records exactly which discs, which reports, and why, with stable
+reason codes (`inactive_status`, `incomplete_flight_data`, `incomplete_manufacturer_data`).
+
+**An export may contain your profile details, disc notes, and complete usage history.** Anyone you
+send the file to can read all of it.
+
 ---
 
 ## Architecture

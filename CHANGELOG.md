@@ -7,6 +7,11 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- `discbag export` — a portable, deterministic JSON snapshot (schema v1.0) of your collection and
+  every computed analysis (coverage, gaps, overlap groups, pairwise comparisons, goal and scenario
+  bags, maturity, next purchase, and exclusions), for consumption by external tools.
+- `db.catalog_id()` — stable brand+name identifier for catalog molds.
+- `roles.canonical_situations()` — the distinct situations and the aliases that resolve onto them.
 - Prototype / partially-known molds. `add --prototype` authors a **local mold** that isn't in the
   catalog — a manufacturer prototype you own — with whatever flight numbers have been published so
   far (partial flight stays genuinely unknown, never zeroed). Record the maker's own claims with
@@ -76,6 +81,12 @@ All notable changes to this project are documented here. The format is based on
   confirmation prompt and `--yes`). `list` gains `--all` and `--status` to view archived discs.
 
 ### Changed
+- Ranking ties are now broken deterministically by disc identity, never by input/inventory order.
+  When two discs score exactly the same, the previous winner depended on list order — reversing
+  your inventory could silently change which disc filled a role. Affects `build-bag`, `recommend`,
+  `choose`, `practice`, `maturity`, and chart listings, in tie cases only.
+- `analysis.compare_verdict()` now returns a structured `CompareVerdict` rather than pre-formatted
+  text; the CLI renders it. Terminal output is unchanged.
 - `round-used` is now the primary verb for recording a round; `used` is documented as its
   alias (`practice-used` records practice). No behavior change — only naming/help clarity.
 - Player profile records a separate putting hand (`--putt-hand`, alias `--putt`) for
