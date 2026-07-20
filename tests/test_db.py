@@ -112,3 +112,33 @@ def test_load_db_reads_runtime_when_present(tmp_path):
 
     loaded = db.load_db(path=runtime, bundled_path=bundled)
     assert loaded["last_updated"] == "runtime"
+
+
+# ---------- catalog_id ----------
+
+def test_catalog_id_from_record_dict():
+    assert db.catalog_id({"brand": "Gateway", "name": "Wizard"}) == "gateway-wizard"
+
+
+def test_catalog_id_normalizes_case_space_and_punctuation():
+    assert db.catalog_id({"brand": "Lone Star Discs", "name": "Artemis"}) == \
+        "lone-star-discs-artemis"
+    assert db.catalog_id({"brand": "Innova", "name": "Mako3"}) == "innova-mako3"
+    assert db.catalog_id({"brand": "Gateway", "name": "Wizard SS"}) == "gateway-wizard-ss"
+
+
+def test_catalog_id_accepts_an_object_with_brand_and_name():
+    from discbag.inventory import Disc
+    d = Disc(name="Wizard", brand="Gateway", category="Putter",
+             speed=2, glide=3, turn=0, fade=2)
+    assert db.catalog_id(d) == "gateway-wizard"
+
+
+def test_catalog_id_omits_empty_parts_without_leaving_a_stray_hyphen():
+    assert db.catalog_id({"brand": "", "name": "Wizard"}) == "wizard"
+    assert db.catalog_id({"brand": "Gateway", "name": ""}) == "gateway"
+
+
+def test_catalog_id_is_deterministic():
+    rec = {"brand": "Gateway", "name": "Wizard"}
+    assert db.catalog_id(rec) == db.catalog_id(rec)

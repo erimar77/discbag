@@ -69,6 +69,33 @@ def normalize_name(query):
     return " ".join(tokens)
 
 
+def _slug(value):
+    """Lowercase alphanumeric runs joined by single hyphens."""
+    out, prev_hyphen = [], True
+    for ch in str(value or "").lower():
+        if ch.isalnum():
+            out.append(ch)
+            prev_hyphen = False
+        elif not prev_hyphen:
+            out.append("-")
+            prev_hyphen = True
+    return "".join(out).strip("-")
+
+
+def catalog_id(record):
+    """Stable identifier for a catalog mold, derived from brand + name.
+
+    Accepts a raw catalog record dict or any object exposing .brand/.name
+    (Disc, OwnedDisc). Stable only while the upstream brand and mold name are
+    unchanged: a catalog rename changes the derived id in schema v1.
+    """
+    if isinstance(record, dict):
+        brand, name = record.get("brand"), record.get("name")
+    else:
+        brand, name = getattr(record, "brand", ""), getattr(record, "name", "")
+    return "-".join(p for p in (_slug(brand), _slug(name)) if p)
+
+
 def _disc_keys(disc):
     """Search keys for a disc: its bare name and brand+name, both normalized."""
     name = normalize_name(disc.get("name", ""))
