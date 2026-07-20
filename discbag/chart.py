@@ -128,7 +128,8 @@ def _render_flight(discs):
 
     lines.append("")
     lines.append("Discs:")
-    for d in sorted(discs, key=lambda x: (-roles.effective_flight(x).speed, stability(x))):
+    for d in sorted(discs, key=lambda x: (-roles.effective_flight(x).speed, stability(x),
+                                          roles.disc_identity_key(x))):
         stab = stability(d)
         sign = f"+{stab:g}" if stab > 0 else f"{stab:g}"
         brand = f"{d.brand} " if d.brand else ""

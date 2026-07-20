@@ -266,7 +266,10 @@ def choose(bag, distance=None, wind=None, shape=None, profile=None):
     target = _shot_target(distance, wind, shape)
     picks = [Pick(disc=d, score=_shot_score(roles.behaves_flight(d, profile), target))
              for d in bag]
-    picks.sort(key=lambda p: p.score)
+    # Tiebreak by identity: two discs can score identically for a shot (twin
+    # molds, or two molds with identical effective flight), and without this
+    # the rank order would depend on the bag's list order.
+    picks.sort(key=lambda p: (p.score, roles.disc_identity_key(p.disc)))
     return picks
 
 
@@ -280,4 +283,8 @@ def _practice_score(flight):
 def practice(bag, count=3, profile=None):
     """The most form-friendly discs in the bag (straight, neutral, controllable)."""
     bag = [d for d in bag if roles.flight_known(d)]
-    return sorted(bag, key=lambda d: _practice_score(roles.behaves_flight(d, profile)))[:count]
+    # Tiebreak by identity: this result is sliced to `count`, so an unresolved
+    # tie at the cutoff wouldn't just reorder discs — it would change WHICH
+    # discs are returned, depending on bag list order.
+    return sorted(bag, key=lambda d: (_practice_score(roles.behaves_flight(d, profile)),
+                                       roles.disc_identity_key(d)))[:count]

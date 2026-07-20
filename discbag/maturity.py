@@ -203,7 +203,9 @@ def _neglected_insight(active, today):
             stale.append((age, d))
     if not stale:
         return None
-    stale.sort(key=lambda t: t[0], reverse=True)
+    # Oldest age first; identity tiebreak keeps the pick deterministic when
+    # two discs have gone unthrown for exactly the same number of days.
+    stale.sort(key=lambda t: (-t[0], roles.disc_identity_key(t[1])))
     name = f"{stale[0][1].brand} {stale[0][1].mold}"
     months = stale[0][0] // 30
     return f"You haven't thrown your {name} in {months}+ months — it may not need a bag spot."
@@ -215,7 +217,9 @@ def _primary_backup_insight(active):
         total = sum(_uses(d) for d in discs)
         if total == 0 or len(discs) < 2:
             continue
-        top = max(discs, key=_uses)
+        # Identity tiebreak: deterministic even when two discs in the category
+        # have the exact same use count.
+        top = max(discs, key=lambda d: (_uses(d), roles.disc_identity_key(d)))
         if _uses(top) / total < DOMINANT_SHARE:
             continue
         # A backup exists if any other disc overlaps the primary's flight.
@@ -233,7 +237,9 @@ def _category_leader_insight(active):
     for cat, discs in _by_category(active).items():
         if len(discs) < 2:
             continue
-        top = max(discs, key=lambda d: d.user.round_count)
+        # Identity tiebreak: deterministic even when two discs in the category
+        # have the exact same round count.
+        top = max(discs, key=lambda d: (d.user.round_count, roles.disc_identity_key(d)))
         if top.user.round_count <= 0:
             continue
         if best is None or top.user.round_count > best[0]:

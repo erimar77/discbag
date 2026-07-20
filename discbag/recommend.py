@@ -199,7 +199,7 @@ def build_bag(bag, size=None, situation=None, goal="coverage",
             gaps.append(role)
             continue
         scored = sorted(((_selection_score(d, role, goal, profile, today), d) for d in available),
-                        key=lambda t: t[0])
+                        key=lambda t: (t[0], roles.disc_identity_key(t[1])))
         pick = _choose(comparable_group(scored), rotate, rng)
         used.add(id(pick))
         fills.append(RoleFill(role, pick, roles.fit_score(pick, role)))
@@ -239,7 +239,7 @@ def build_bag_explained(bag, situation=None, goal="coverage", rotate=False,
             decisions.append(RoleDecision(role, [], None, [], False))
             continue
         ranked = sorted((score_disc(d, role, goal, profile, today) for d in available),
-                        key=lambda s: s.internal)
+                        key=lambda s: (s.internal, roles.disc_identity_key(s.disc)))
         scored = [(s.internal, s.disc) for s in ranked]
         comparable = comparable_group(scored)
         pick = _choose(comparable, rotate, rng)

@@ -75,7 +75,8 @@ def flight_scatter(discs, width=60, height=32):
 
     lines.append("")
     lines.append("Discs:")
-    for d in sorted(discs, key=lambda x: (-roles.effective_flight(x).speed, _stability(x))):
+    for d in sorted(discs, key=lambda x: (-roles.effective_flight(x).speed, _stability(x),
+                                          roles.disc_identity_key(x))):
         brand = f"{d.brand} " if getattr(d, "brand", "") else ""
         f = roles.effective_flight(d)
         nums = "/".join(_g(v) for v in (f.speed, f.glide, f.turn, f.fade))

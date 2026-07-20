@@ -90,6 +90,26 @@ def test_multiple_discs_can_share_a_role():
     assert len(mid.discs) == 2
 
 
+def test_assess_disc_order_is_independent_of_bag_order_on_exact_ties():
+    # Two copies of the same mold: identical flight numbers, so identical
+    # fit_score for every role they qualify for -- an exact tie with nothing
+    # but disc identity to break it.
+    def wizard(disc_id):
+        d = OwnedDisc.from_db_record(
+            {"name": "Wizard", "brand": "Gateway", "category": "Putter", "stability": "",
+             "speed": 2, "glide": 3, "turn": 0, "fade": 2})
+        d.id = disc_id
+        return d
+
+    a, b = wizard("id-a"), wizard("id-b")
+
+    def putting_order(bag):
+        rc = next(rc for rc in roles.assess(bag) if rc.role.name == "Putting")
+        return [d.id for d in rc.discs]
+
+    assert putting_order([a, b]) == putting_order([b, a])
+
+
 # ---------- suggestions & best next ----------
 
 def test_suggest_returns_qualifying_unowned_discs():

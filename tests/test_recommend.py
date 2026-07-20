@@ -44,6 +44,17 @@ def test_build_bag_uses_distinct_discs_when_available():
     assert not result.gaps
 
 
+def test_build_bag_pick_is_independent_of_bag_order_on_exact_ties():
+    # Two different molds with identical flight numbers -- an exact fit_score
+    # tie for Putting, with nothing but disc identity to break it.
+    twin_a = Disc(name="Wizard", speed=2, glide=3, turn=0, fade=2)
+    twin_b = Disc(name="Aviar", speed=2, glide=3, turn=0, fade=2)
+
+    forward = filled_roles(recommend.build_bag([twin_a, twin_b]))
+    backward = filled_roles(recommend.build_bag([twin_b, twin_a]))
+    assert forward["Putting"].name == backward["Putting"].name
+
+
 def test_build_bag_size_limits_fills():
     result = recommend.build_bag([MAKO3, WIZARD, LEOPARD, FIREBIRD, DESTROYER], size=2)
     assert len(result.filled) == 2
@@ -150,10 +161,13 @@ def test_rotation_can_pick_a_comparable_alternative():
         def choice(self, seq):
             return seq[-1]
 
-    bag = [MAKO3, Disc(name="Buzzz", speed=5, glide=4, turn=-1, fade=1)]  # equal-fit straight mids
+    # Equal-fit straight mids (an exact score tie) -- comparable_group orders
+    # them by disc identity (name), not by bag list order, so the group is
+    # always [Buzzz, Mako3] and seq[-1] is deterministically Mako3.
+    bag = [MAKO3, Disc(name="Buzzz", speed=5, glide=4, turn=-1, fade=1)]
     result = recommend.build_bag(bag, rotate=True, rng=LastRNG())
     picked = {f.role.name: f.disc.name for f in result.filled}
-    assert picked.get("Straight mid") == "Buzzz"
+    assert picked.get("Straight mid") == "Mako3"
 
 
 def test_no_rotation_is_deterministic_best():

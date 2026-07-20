@@ -34,6 +34,40 @@ def flight_known(disc):
     return _personal_complete(disc) or _manufacturer_complete(disc)
 
 
+def disc_identity_key(disc):
+    """A total, stable secondary sort key for breaking exact ranking ties.
+
+    Every ranking in this engine sorts discs by a computed score (fit_score,
+    a selection score, a usage count, ...). Two discs can score *exactly* the
+    same — two copies of the same mold, or two different molds with
+    identical flight numbers — and a bare `sorted(..., key=score)` then falls
+    back to silently resolving the tie by input list order. That makes
+    "which disc is the best fit for this role" or "which disc gets picked
+    for the bag" depend on whatever order the caller happened to pass discs
+    in, which is not a property anyone should be able to observe: reversing
+    an inventory list must never change a conclusion.
+
+    This key exists ONLY to make that fallback deterministic — it expresses
+    no preference between tied discs, no quality judgment, nothing worth
+    reading meaning into. Callers use it strictly as a secondary key after
+    the real score, so it never overrides the score and never reorders two
+    discs that scored differently.
+
+    It must be defined for every disc the engine ranks, including both:
+      - `OwnedDisc`, which carries a permanent, unique `.id`; and
+      - a bare `Disc` (a catalog mold, e.g. from `roles.suggest`), which has
+        no `.id` at all.
+    So the key prefers `.id` when present and falls back to `.name`, which
+    every disc has. This makes it total (always comparable — both fields are
+    plain strings) and stable (the same disc, or the same catalog mold name,
+    always sorts to the same place regardless of input order). Two bare
+    `Disc` objects for the same mold name remain a genuine, irreducible tie
+    — there is nothing left to distinguish them by, and that's fine: they
+    are, for ranking purposes, interchangeable.
+    """
+    return (getattr(disc, "id", "") or "", disc.name)
+
+
 def stability_number(disc):
     """turn + fade, or None if flight is incomplete."""
     if disc.turn is None or disc.fade is None:
@@ -268,7 +302,7 @@ def assess(bag, profile=None):
     assessment = []
     for role in ROLES:
         fits = sorted((d for d in bag if qualifies(d, role)),
-                      key=lambda d: fit_score(d, role))
+                      key=lambda d: (fit_score(d, role), disc_identity_key(d)))
         covered = bool(fits)
         reason = role.covered_reason if covered else role.missing_reason
         priority, priority_reason = _priority(role, covered, bag, profile)
@@ -308,9 +342,12 @@ def suggest(role, owned, catalog, n=3, profile=None, preferred_only=False):
 
     picks = [Pick(d, fit_score(d, role)) for d in candidates]
     # Preferred brands get a fit "discount", so they lead only among close fits;
-    # a clearly better non-preferred disc (gap > boost) still ranks first.
+    # a clearly better non-preferred disc (gap > boost) still ranks first. The
+    # identity key is a pure tiebreak: two catalog molds can land on the exact
+    # same discounted score and raw score (identical flight numbers), and
+    # without it the order would depend on catalog list order.
     picks.sort(key=lambda p: (p.score - (SUGGEST_BRAND_BOOST if is_preferred(p.disc) else 0),
-                              p.score))
+                              p.score, disc_identity_key(p.disc)))
     return picks[:n]
 
 
