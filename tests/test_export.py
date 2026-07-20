@@ -343,3 +343,75 @@ def test_scenario_bags_goal_default_reads_from_analysis_defaults():
 
     finally:
         export.ANALYSIS_DEFAULTS["goal"] = original_goal
+
+
+# ---------- overlap groups ----------
+
+def twins():
+    """Two near-identical putters plus one clearly distinct driver."""
+    return [
+        owned(name="Wizard", brand="Gateway", disc_id="id-a"),
+        owned(name="Challenger", brand="Discraft", disc_id="id-b"),
+        owned(name="Destroyer", brand="Innova", category="Distance Driver",
+              speed=12, glide=5, turn=-1, fade=3, disc_id="id-c"),
+    ]
+
+
+def test_overlap_groups_reference_member_inventory_ids():
+    groups = build(twins())["analysis"]["overlap_groups"]
+    assert groups
+    assert groups[0]["inventory_ids"] == ["id-a", "id-b"]
+
+
+def test_overlap_group_id_is_deterministic_and_documented_as_structural():
+    first = build(twins())["analysis"]["overlap_groups"][0]["group_id"]
+    second = build(twins())["analysis"]["overlap_groups"][0]["group_id"]
+    assert first == second
+
+
+def test_overlap_groups_carry_no_invented_score_or_reasoning():
+    # overlap() returns groups only; nothing is manufactured to fill those slots.
+    group = build(twins())["analysis"]["overlap_groups"][0]
+    assert set(group) == {"group_id", "inventory_ids"}
+
+
+# ---------- pairwise comparisons ----------
+
+def test_pairwise_endpoints_are_ordered_min_then_max():
+    pairs = build(twins())["analysis"]["pairwise_comparisons"]
+    for p in pairs:
+        assert p["left_inventory_id"] < p["right_inventory_id"]
+
+
+def test_pairwise_covers_each_unordered_pair_exactly_once():
+    pairs = build(twins())["analysis"]["pairwise_comparisons"]
+    seen = {(p["left_inventory_id"], p["right_inventory_id"]) for p in pairs}
+    assert seen == {("id-a", "id-b"), ("id-a", "id-c"), ("id-b", "id-c")}
+
+
+def test_pairwise_is_sorted_by_endpoints():
+    pairs = build(twins())["analysis"]["pairwise_comparisons"]
+    keys = [(p["left_inventory_id"], p["right_inventory_id"]) for p in pairs]
+    assert keys == sorted(keys)
+
+
+def test_pairwise_verdict_carries_structured_fields():
+    pairs = build(twins())["analysis"]["pairwise_comparisons"]
+    v = pairs[0]["verdict"]
+    assert set(v) == {"overlap_text", "key_difference", "how_to_use", "degraded_note"}
+    assert v["degraded_note"] is None      # always exactly two discs here
+
+
+def test_pairwise_omits_the_presentation_table():
+    # compare() is a terminal table; its facts already live in the inventory records.
+    pairs = build(twins())["analysis"]["pairwise_comparisons"]
+    assert "comparison" not in pairs[0]
+
+
+def test_pairwise_carries_no_relationship_taxonomy():
+    pairs = build(twins())["analysis"]["pairwise_comparisons"]
+    assert "kind" not in pairs[0]
+
+
+def test_single_disc_produces_an_empty_pairwise_list():
+    assert build([owned()])["analysis"]["pairwise_comparisons"] == []

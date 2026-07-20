@@ -11,8 +11,9 @@ what makes build_export() deterministic and byte-reproducible in tests.
 """
 
 from dataclasses import asdict
+from itertools import combinations
 
-from discbag import __version__, db, maturity, player, recommend, roles
+from discbag import __version__, analysis, db, maturity, player, recommend, roles
 from discbag.recommend import GOALS
 from discbag.inventory import Disc
 
@@ -203,6 +204,43 @@ def _bag_result(active, profile, analysis_date, goal=None, situation=None):
     }
 
 
+def _overlap_groups(active, profile):
+    """The engine's thresholded clusters. overlap() returns member discs only —
+    no score and no reasoning — so neither is exported."""
+    out = []
+    for group in analysis.overlap(active, profile=profile):
+        ids = sorted(d.id for d in group)
+        # Structural identifier for rendering, derived from the sorted members.
+        # Not an engine conclusion.
+        out.append({"group_id": "overlap-" + "-".join(ids), "inventory_ids": ids})
+    return sorted(out, key=lambda g: g["inventory_ids"])
+
+
+def _verdict_dict(verdict):
+    return {"overlap_text": verdict.overlap_text,
+            "key_difference": verdict.key_difference,
+            "how_to_use": verdict.how_to_use,
+            "degraded_note": verdict.degraded_note}
+
+
+def _pairwise_comparisons(active):
+    """Existing compare_verdict() output for each eligible unordered pair.
+
+    The compare() table is deliberately omitted: it is presentation, and every
+    fact it shows already lives in the two referenced inventory records.
+    """
+    out = []
+    for a, b in combinations(active, 2):
+        left, right = (a, b) if a.id <= b.id else (b, a)
+        verdict = analysis.compare_verdict([left, right])
+        if verdict is None:           # incomplete flight: engine declines to judge
+            continue
+        out.append({"left_inventory_id": left.id,
+                    "right_inventory_id": right.id,
+                    "verdict": _verdict_dict(verdict)})
+    return sorted(out, key=lambda p: (p["left_inventory_id"], p["right_inventory_id"]))
+
+
 def build_export(inventory, profile, catalog, *, analysis_date, generated_at):
     """A complete, deterministic snapshot of the collection and its analysis.
 
@@ -234,6 +272,8 @@ def build_export(inventory, profile, catalog, *, analysis_date, generated_at):
             name: _bag_result(active, profile, analysis_date, situation=name)
             for name in canonical}
         analysis_section["scenario_aliases"] = dict(aliases)
+        analysis_section["overlap_groups"] = _overlap_groups(active, profile)
+        analysis_section["pairwise_comparisons"] = _pairwise_comparisons(active)
     analysis_section["maturity"] = _maturity(active, inventory, profile, analysis_date)
 
     return {
